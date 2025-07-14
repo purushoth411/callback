@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const bcrypt = require("bcrypt");
+const crypto = require('crypto');
 
 const getUserByUserName = (username, callback) => {
     const sql = 'SELECT * FROM tbl_admin WHERE fld_username = ? LIMIT 1';
@@ -97,6 +97,8 @@ const getUserCount = (callback) => {
 
 
 
+
+
 const addUser = (userData, callback) => {
   const {
     usertype,
@@ -129,41 +131,40 @@ const addUser = (userData, callback) => {
   }
   const client_code = prefix + Math.floor(10000 + Math.random() * 90000);
 
-  // Encrypt password
-  bcrypt.hash(password, 10, (err, hashedPassword) => {
-    if (err) return callback(err);
+  // Encrypt password using MD5
+  const hashedPassword = crypto.createHash('md5').update(password).digest('hex');
 
-    const sql = `
-      INSERT INTO tbl_admin 
-      (fld_admin_type, fld_team_id, fld_client_code, fld_username, fld_name, fld_email, fld_phone, fld_password, fld_decrypt_password, fld_consultant_type, fld_subadmin_type, fld_permission, fld_addedon, fld_pass_last_upd_day, attendance, fld_sevice_provider)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?)
-    `;
+  const sql = `
+    INSERT INTO tbl_admin 
+    (fld_admin_type, fld_team_id, fld_client_code, fld_username, fld_name, fld_email, fld_phone, fld_password, fld_decrypt_password, fld_consultant_type, fld_subadmin_type, fld_permission, fld_addedon, fld_pass_last_upd_day, attendance, fld_sevice_provider)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?)
+  `;
 
-    const isConsultant = usertype === "CONSULTANT" ? "PRESENT" : null;
-    const isService = usertype === "CONSULTANT" ? "No" : null;
+  const isConsultant = usertype === "CONSULTANT" ? "PRESENT" : null;
+  const isService = usertype === "CONSULTANT" ? "No" : null;
 
-    db.query(
-      sql,
-      [
-        usertype,
-        team_id || "",
-        client_code,
-        username,
-        name,
-        email,
-        phone,
-        hashedPassword,
-        password,
-        consultant_type || "",
-        subadmin_type || "",
-        permissions || "[]",
-        isConsultant,
-        isService,
-      ],
-      callback
-    );
-  });
+  db.query(
+    sql,
+    [
+      usertype,
+      team_id || "",
+      client_code,
+      username,
+      name,
+      email,
+      phone,
+      hashedPassword,
+      password,
+      consultant_type || "",
+      subadmin_type || "",
+      permissions || "[]",
+      isConsultant,
+      isService,
+    ],
+    callback
+  );
 };
+
 
 
 const getAllUsersIncludingAdmin = (callback) =>{
