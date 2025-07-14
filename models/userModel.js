@@ -166,6 +166,52 @@ const addUser = (userData, callback) => {
 };
 
 
+const updateUser = (userData, callback) => {
+  const {
+    user_id,
+    team_id,
+    username,
+    name,
+    email,
+    phone,
+    
+    consultant_type,
+    subadmin_type,
+    permissions,
+  } = userData;
+
+  let sql = `
+    UPDATE tbl_admin
+    SET 
+      fld_team_id = ?, 
+      fld_username = ?, 
+      fld_name = ?, 
+      fld_email = ?, 
+      fld_phone = ?, 
+     
+      fld_consultant_type = ?, 
+      fld_subadmin_type = ?, 
+      fld_permission = ?
+     
+    WHERE id = ?
+  `;
+
+  const params = [
+    Array.isArray(team_id) ? team_id.join(",") : team_id,
+    username,
+    name,
+    email,
+    phone,
+   
+    consultant_type || "",
+    subadmin_type || "",
+    permissions,
+    user_id,
+  ];
+
+  db.query(sql, params, callback);
+};
+
 
 const getAllUsersIncludingAdmin = (callback) =>{
     const sql = 'SELECT * from tbl_admin';
@@ -175,17 +221,14 @@ const getAllUsersIncludingAdmin = (callback) =>{
     })
 }
 
+const updateUserStatus = (userId, status, callback) => {
+  const sql = `UPDATE tbl_admin SET status = ? WHERE id = ?`;
+  const params = [status, userId];
 
-
-// Update user
-const updateUser = (id, userData, callback) => {
-    const sql = 'UPDATE tbl_admin SET fld_first_name = ?, fld_email = ?, fld_decrypt_password = ?, fld_admin_type = ? WHERE id = ?';
-    const { name, email, password, user_type } = userData;
-    db.query(sql, [name, email, password, user_type, id], (err, result) => {
-        if (err) return callback(err, null);
-        return callback(null, result);
-    });
+  db.query(sql, params, callback);
 };
+
+
 
 // Delete user
 const deleteUser = (id, callback) => {
@@ -203,5 +246,6 @@ module.exports = {
     addUser,
     
     updateUser,
+    updateUserStatus,
     deleteUser
 };

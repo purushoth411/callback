@@ -106,6 +106,67 @@ const addUser = (req, res) => {
   });
 };
 
+
+const updateUser = (req, res) => {
+  const user_id = req.params.id;
+  const {
+    team_id,
+    username,
+    name,
+    email,
+    phone,
+    
+    consultant_type,
+    subadmin_type,
+    permissions,
+  } = req.body;
+
+  if (!username || !name || !email || !phone) {
+    return res.status(400).json({ status: false, message: "Missing required fields" });
+  }
+
+  userModel.updateUser(
+    {
+      user_id,
+      team_id,
+      username,
+      name,
+      email,
+      phone,
+     
+      consultant_type,
+      subadmin_type,
+      permissions: JSON.stringify(permissions || {}),
+    },
+    (err, result) => {
+      if (err) {
+        console.error("DB Error:", err);
+        return res.status(500).json({ status: false, message: "Database error" });
+      }
+
+      return res.json({ status: true, message: "User updated successfully" });
+    }
+  );
+};
+
+const updateUserStatus = (req, res) => {
+  const userId = req.params.id;
+  const { status } = req.body;
+
+  if (!["ACTIVE", "INACTIVE"].includes(status)) {
+    return res.status(400).json({ status: false, message: "Invalid status value" });
+  }
+
+  userModel.updateUserStatus(userId, status, (err, result) => {
+    if (err) {
+      console.error("DB Error:", err);
+      return res.status(500).json({ status: false, message: "Database error" });
+    }
+
+    return res.json({ status: true, message: "User status updated successfully" });
+  });
+};
+
 const getAllUsersIncludingAdmin = (req, res) =>{
     userModel.getAllUsersIncludingAdmin((err, users) => {
         if(err){
@@ -118,21 +179,7 @@ const getAllUsersIncludingAdmin = (req, res) =>{
 
 
 
-// Update user
-const updateUser = (req, res) => {
-    const { id } = req.params;
-    const { name, email, password, user_type } = req.body;
-    if (!name || !email || !password || !user_type) {
-        return res.status(400).json({ status: false, message: 'All fields are required' });
-    }
 
-    userModel.updateUser(id, req.body, (err, result) => {
-        if (err) {
-            return res.status(500).json({ status: false, message: 'Failed to update user: ' + err });
-        }
-        return res.json({ status: true, message: 'User updated successfully' });
-    });
-};
 
 // Delete user
 const deleteUser = (req, res) => {
@@ -151,5 +198,6 @@ module.exports = {
     addUser,
     
     updateUser,
+    updateUserStatus,
     deleteUser
 };
