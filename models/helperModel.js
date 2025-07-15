@@ -6,6 +6,7 @@ const getAllActiveTeams = (callback) => {
     const sql = `
         SELECT * FROM tbl_team
         ORDER BY fld_addedon DESC
+        WHERE status = 'Active'
     `;
     db.query(sql, (err, results) => {
         if (err) return callback(err, null);
@@ -13,7 +14,7 @@ const getAllActiveTeams = (callback) => {
     });
 };
 
-const getTeams = (callback) => {
+const getAllTeams = (callback) => {
     const sql = `
         SELECT 
           *
@@ -30,6 +31,28 @@ const getTeams = (callback) => {
     });
 };
 
+const addTeam = (teamData, callback) => {
+  const sql = `INSERT INTO tbl_team (fld_title, fld_addedon, status) VALUES (?, NOW(), 'Active')`;
+  db.query(sql, [teamData.team], (err, result) => {
+    if (err) return callback(err);
+    return callback(null, result);
+  });
+};
+
+const updateTeam = (id, teamData, callback) => {
+  const sql = `UPDATE tbl_team SET fld_title = ? WHERE id = ?`;
+  db.query(sql, [teamData.team, id], (err, result) => {
+    if (err) return callback(err);
+    return callback(null, result);
+  });
+};
+
+const updateTeamStatus = (teamId, status, callback) => {
+  const sql = `UPDATE tbl_team SET status = ? WHERE id = ?`;
+  const params = [status, teamId];
+
+  db.query(sql, params, callback);
+};
 
 const getAllDomains = (callback) => {
   const sql = `
@@ -335,49 +358,9 @@ const getAdminNameById = (adminId) => {
 
 
 
-const getAllTeams = (callback) => {
-    const teamSql = 'SELECT * FROM tbl_teams';
-    db.query(teamSql, (err, teams) => {
-        if (err) return callback(err, null);
 
-        const adminSql = 'SELECT id, fld_first_name, fld_last_name FROM tbl_admin';
-        db.query(adminSql, (err2, admins) => {
-            if (err2) return callback(err2, null);
 
-            // Create a map of admin IDs to full names
-            const adminMap = {};
-            admins.forEach(admin => {
-                adminMap[admin.id] = `${admin.fld_first_name} ${admin.fld_last_name}`;
-            });
 
-            // Build the final team data
-            const teamsWithDetails = teams.map(team => {
-                // Get team member names
-                const memberIds = team.team_members ? team.team_members.split(',').map(id => parseInt(id.trim())) : [];
-                const memberNames = memberIds.map(id => adminMap[id] || 'Unknown');
-
-                // Get creator name
-                const createdByName = adminMap[team.created_by] || 'Unknown';
-
-                return {
-                    ...team,
-                    team_members_details: memberNames,
-                    created_by_name: createdByName
-                };
-            });
-
-            return callback(null, teamsWithDetails);
-        });
-    });
-};
-
-const updateTeam = (teamId, teamName, teamMembers, callback) => {
-    const sql = 'UPDATE tbl_teams SET team_name = ?, team_members = ? WHERE id = ?';
-    db.query(sql, [teamName, teamMembers, teamId], (err, result) => {
-        if (err) return callback(err, null);
-        return callback(null, result);
-    });
-};
 
 const createTeam = (teamName, teamMembers, createdBy, callback) => {
     const sql = 'INSERT INTO tbl_teams (team_name, team_members, created_by) VALUES (?, ?, ?)';
@@ -633,6 +616,9 @@ module.exports = {
    
     getAllTeams,
     getAllActiveTeams,
+    addTeam,
+    updateTeam,
+    updateTeamStatus,
     getAllDomains
    
 };

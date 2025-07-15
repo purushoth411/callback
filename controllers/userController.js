@@ -95,11 +95,11 @@ const addUser = (req, res) => {
     password,
     consultant_type,
     subadmin_type,
-    permissions: JSON.stringify(permissions || {}),
+    permissions,
   }, (err, result) => {
     if (err) {
       console.error("Error:", err);
-      return res.status(500).json({ status: false, message: "Database error" });
+      return res.status(500).json({ status: false, message: "Database error ".err });
     }
 
     return res.json({ status: true, message: "User added successfully" });

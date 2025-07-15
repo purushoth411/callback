@@ -113,7 +113,6 @@ const addUser = (userData, callback) => {
     permissions,
   } = userData;
 
-  // Generate client code
   let prefix = "";
   switch (usertype) {
     case "CONSULTANT":
@@ -129,10 +128,13 @@ const addUser = (userData, callback) => {
       prefix = "OPEADM#";
       break;
   }
-  const client_code = prefix + Math.floor(10000 + Math.random() * 90000);
 
-  // Encrypt password using MD5
+  const client_code = prefix + Math.floor(10000 + Math.random() * 90000);
   const hashedPassword = crypto.createHash('md5').update(password).digest('hex');
+
+  // ✅ Convert arrays to strings
+  const team_id_str = Array.isArray(team_id) ? team_id.join(",") : team_id;
+  const permissions_str = JSON.stringify(permissions || []);
 
   const sql = `
     INSERT INTO tbl_admin 
@@ -147,7 +149,7 @@ const addUser = (userData, callback) => {
     sql,
     [
       usertype,
-      team_id || "",
+      team_id_str,              // ✅ converted to "6,1"
       client_code,
       username,
       name,
@@ -157,13 +159,14 @@ const addUser = (userData, callback) => {
       password,
       consultant_type || "",
       subadmin_type || "",
-      permissions || "[]",
+      permissions_str,          // ✅ converted to '["Reassign","Approve Add Call Request"]'
       isConsultant,
       isService,
     ],
     callback
   );
 };
+
 
 
 const updateUser = (userData, callback) => {
@@ -212,6 +215,12 @@ const updateUser = (userData, callback) => {
   db.query(sql, params, callback);
 };
 
+const updateUserStatus = (userId, status, callback) => {
+  const sql = `UPDATE tbl_admin SET status = ? WHERE id = ?`;
+  const params = [status, userId];
+
+  db.query(sql, params, callback);
+};
 
 const getAllUsersIncludingAdmin = (callback) =>{
     const sql = 'SELECT * from tbl_admin';
@@ -221,12 +230,7 @@ const getAllUsersIncludingAdmin = (callback) =>{
     })
 }
 
-const updateUserStatus = (userId, status, callback) => {
-  const sql = `UPDATE tbl_admin SET status = ? WHERE id = ?`;
-  const params = [status, userId];
 
-  db.query(sql, params, callback);
-};
 
 
 

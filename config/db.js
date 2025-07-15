@@ -5,7 +5,7 @@ var connection = mysql.createPool({
     host: '50.87.148.156',
     user: 'rapidcol_call_ca',
     password: 'nv0@Fg)^ZcvW',
-    database: 'rapidcol_call_calendar',
+    database: 'rapidcol_call_calendar_test',
     charset: 'utf8mb4',
     connectTimeout: 20000, 
     timezone: 'Asia/Kolkata',
