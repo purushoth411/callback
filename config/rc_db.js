@@ -3,9 +3,9 @@ var mysql = require('mysql');
 var connection = mysql.createPool({
     connectionLimit: 100,
     host: '50.87.148.156',
-    user: 'rapidcol_call_ca',
-    password: 'nv0@Fg)^ZcvW',
-    database: 'rapidcol_call_calendar_test',
+    user: 'rapidcol_rc_main',
+    password: 'rc_main#123',
+    database: 'rapidcol_rc_main',
     charset: 'utf8mb4',
     connectTimeout: 20000, 
     timezone: 'Asia/Kolkata',
@@ -17,7 +17,7 @@ connection.getConnection((err, connection) => {
         console.error('Error connecting to the database:', err);
         process.exit(1);
     }
-    console.log('Connected to Call Calendar database');
+    console.log('Connected to Rc database');
     connection.release(); 
 });
 

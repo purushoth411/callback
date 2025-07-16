@@ -2,10 +2,10 @@ var mysql = require('mysql');
 
 var connection = mysql.createPool({
     connectionLimit: 100,
-    host: '50.87.148.156',
-    user: 'rapidcol_call_ca',
-    password: 'nv0@Fg)^ZcvW',
-    database: 'rapidcol_call_calendar_test',
+    host: '162.241.126.79',
+    user: 'pragya',
+    password: 'mK%0f35v',
+    database: 'pragya_db',
     charset: 'utf8mb4',
     connectTimeout: 20000, 
     timezone: 'Asia/Kolkata',
@@ -17,7 +17,7 @@ connection.getConnection((err, connection) => {
         console.error('Error connecting to the database:', err);
         process.exit(1);
     }
-    console.log('Connected to Call Calendar database');
+    console.log('Connected to InstaCrm database');
     connection.release(); 
 });
 

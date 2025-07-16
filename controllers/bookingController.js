@@ -48,6 +48,58 @@ const getBookingHistory = (req, res) => {
     return res.status(200).json({ status: true, data: results });
   });
 };
+
+const getPresaleClientDetails=(req,res)=>{
+  const client_id=req.params.client_id;
+
+  if(!client_id){
+ return res.status(400).json({ status: false, message: "Missing Client ID" });
+  }
+  bookingModel.getPresaleClientDetails(client_id, (err, result) => {
+    if (err) {
+      console.error("Error fetching client details history:", err);
+      return res.status(500).json({ status: false, message: "Database error" });
+    }
+
+    return res.status(200).json({ status: true, data: result });
+});
+}
+
+const getPostsaleClientDetails=(req,res)=>{
+  const client_id=req.params.client_id;
+
+  if(!client_id){
+ return res.status(400).json({ status: false, message: "Missing Client ID" });
+  }
+  bookingModel.getPostsaleClientDetails(client_id, (err, result) => {
+    if (err) {
+      console.error("Error fetching client details history:", err);
+      return res.status(500).json({ status: false, message: "Database error" });
+    }
+
+    return res.status(200).json({ status: true, data: result });
+});
+}
+
+const getProjectMilestones = (req, res) => {
+  const projectId = req.params.projectId;
+
+  if (!projectId) {
+    return res.status(400).json({ status: false, message: "Missing project ID" });
+  }
+
+  
+  bookingModel.getProjectMilestones(projectId, (err, result) => {
+    if (err) {
+      console.error("Error fetching milestones:", err);
+      return res.status(500).json({ status: false, message: "Database error" });
+    }
+
+    return res.status(200).json({ status: true, data: result });
+  });
+};
+
+
 module.exports={
-    fetchBookings,getBookingHistory
+    fetchBookings,getBookingHistory,getPresaleClientDetails,getPostsaleClientDetails,getProjectMilestones
 }

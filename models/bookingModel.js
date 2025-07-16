@@ -1,4 +1,6 @@
 const db = require('../config/db');
+const instacrm_db = require('../config/instacrm_db');
+const rc_db = require('../config/rc_db');
 
 const getBookings = (userId, userType, assigned_team, filters, callback) => {
   let sql = `
@@ -73,7 +75,7 @@ const getBookings = (userId, userType, assigned_team, filters, callback) => {
     });
   };
 
-  // ✅ Access Control Logic
+  
   if (userType === 'SUPERADMIN') {
     buildRemainingFiltersAndExecute();
   } else if (userType === 'SUBADMIN' && assigned_team) {
@@ -144,6 +146,151 @@ const getBookingHistory = (bookingId, callback) => {
   });
 };
 
+
+
+
+
+// Get Presales client details from InstaCRM
+const getPresaleClientDetails = (client_id, callback) => {
+  // First: Get query_id from tbl_assign_query using given client_id
+  const queryAssignSQL = "SELECT query_id FROM tbl_assign_query WHERE id = ? LIMIT 1";
+
+  instacrm_db.query(queryAssignSQL, [client_id], (err, assignResult) => {
+    if (err) return callback(err);
+
+    if (!assignResult || assignResult.length === 0) {
+      return callback(null, null); // no result found
+    }
+
+    const query_id = assignResult[0].query_id;
+
+    // Second: Fetch client details from tbl_query using query_id
+    const queryDetailsSQL = `
+      SELECT 
+        name,
+        email_id AS email,
+        alt_email_id,
+        phone,
+        alt_contact_no,
+        date,
+        location,
+        state_id,
+        city,
+        complete_address,
+        designation,
+        company_name,
+        website,
+        other_website,
+        area_of_study,
+        requirement,
+        other_requirement,
+        priority,
+        word_count,
+        deadline,
+        academic_level,
+        approx_value,
+        follow_up_date,
+        no_day,
+        subject,
+        contact_by,
+        remarks,
+        flag_mark,
+        status,
+        created_on,
+        query_type,
+        entrytype,
+        sourceoflead,
+        deleted_at,
+        created_at,
+        updated_at,
+        claimed_by,
+        if_auto_claim,
+        send_whatsapp,
+        requirement_line,
+        line_format,
+        paragraph_format,
+        latest_requirement
+      FROM tbl_query 
+      WHERE id = ? 
+      LIMIT 1
+    `;
+
+    instacrm_db.query(queryDetailsSQL, [query_id], (err2, queryResult) => {
+      if (err2) return callback(err2);
+
+      if (!queryResult || queryResult.length === 0) {
+        return callback(null, null); // query ID found but no data in tbl_query
+      }
+
+      return callback(null, queryResult[0]);
+    });
+  });
+};
+
+const getPostsaleClientDetails = (client_id, callback) => {
+  // First: Get student from tbl_scholar by student_code
+  const studentSQL = `
+    SELECT 
+      st_id,
+      st_name AS name,
+      st_email AS email,
+      contact_no AS phone,
+      address1
+    FROM tbl_scholar 
+    WHERE student_code = ? 
+    LIMIT 1
+  `;
+
+  rc_db.query(studentSQL, [client_id], (err, studentResult) => {
+    if (err) return callback(err);
+
+    if (!studentResult || studentResult.length === 0) {
+      return callback(null, null); // No matching student
+    }
+
+    const student = studentResult[0];
+    const st_id = student.st_id;
+
+    // Now: Fetch projects for this student
+    const projectSQL = `
+      SELECT 
+        id, project_title 
+      FROM tbl_project 
+      WHERE student_id = ?
+    `;
+
+    rc_db.query(projectSQL, [st_id], (err2, projectResults) => {
+      if (err2) return callback(err2);
+
+      // Return both student and projects
+      const response = {
+        name: student.name,
+        email: student.email,
+        phone: student.phone,
+        address: student.address1,
+        projects: projectResults || []
+      };
+
+      return callback(null, response);
+    });
+  });
+};
+
+
+const getProjectMilestones = (projectId, callback) => {
+  const sql = `
+    SELECT id, segment_title 
+    FROM tbl_segment 
+    WHERE project_id = ?
+    ORDER BY segment_date ASC
+  `;
+
+  rc_db.query(sql, [projectId], (err, results) => {
+    if (err) return callback(err);
+    callback(null, results);
+  });
+};
+
+
 module.exports ={
-    getBookings,getBookingHistory
-}
+    getBookings,getBookingHistory,getPresaleClientDetails,getPostsaleClientDetails,getProjectMilestones}
