@@ -3,16 +3,17 @@ const db = require('../config/db'); // Update path if needed
 
 
 const getAllActiveTeams = (callback) => {
-    const sql = `
-        SELECT * FROM tbl_team
-        ORDER BY fld_addedon DESC
-        WHERE status = 'Active'
-    `;
-    db.query(sql, (err, results) => {
-        if (err) return callback(err, null);
-        return callback(null, results);
-    });
+  const sql = `
+    SELECT * FROM tbl_team
+    WHERE status = 'Active'
+    ORDER BY fld_addedon DESC
+  `;
+  db.query(sql, (err, results) => {
+    if (err) return callback(err, null);
+    return callback(null, results);
+  });
 };
+
 
 const getAllTeams = (callback) => {
     const sql = `
