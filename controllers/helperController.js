@@ -101,7 +101,42 @@ const getAllDomains = (req, res) => {
   });
 };
 
+
+const getAllSubjectAreas=(req,res)=>{
+  try{
+    helperModel.getAllSubjectAreas((err,results)=>{
+       if (err) {
+      console.error("Error fetching subject areas:", err);
+      return res.status(500).json({ status: false, message: "Database error" });
+    }
+
+    return res.json({ status: true, data: results });
+    })
+  }catch(err){
+    console.error("Error in getting Subject Areas:",err);
+    return res.status(404).json({ status: false, message: `Server error occurred in controller` });
+  }
+}
+
+const getAllActiveConsultants=(req,res)=>{
+ try{
+    helperModel.getAllActiveConsultants((err,results)=>{
+       if (err) {
+      console.error("Error fetching consultants:", err);
+      return res.status(500).json({ status: false, message: "Database error" });
+    }
+
+    return res.json({ status: true, data: results });
+    })
+  }catch(err){
+    console.error("Error in getting consultants:",err);
+    return res.status(404).json({ status: false, message: `Server error occurred in controller` });
+  }
+}
+
 module.exports = {
-    getAllActiveTeams, getAllTeams,addTeam,updateTeam,updateTeamStatus,getAllDomains
+    getAllActiveTeams, getAllTeams,addTeam,updateTeam,updateTeamStatus,getAllDomains,
+    getAllSubjectAreas,
+    getAllActiveConsultants,
 
 };
