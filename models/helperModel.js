@@ -1,6 +1,5 @@
 // models/helperModel.js
-const db = require('../config/db'); // Update path if needed
-
+const db = require("../config/db"); // Update path if needed
 
 const getAllActiveTeams = (callback) => {
   const sql = `
@@ -14,9 +13,8 @@ const getAllActiveTeams = (callback) => {
   });
 };
 
-
 const getAllTeams = (callback) => {
-    const sql = `
+  const sql = `
         SELECT 
           *
         FROM 
@@ -26,10 +24,10 @@ const getAllTeams = (callback) => {
             tbl_team.fld_addedon DESC
     `;
 
-    db.query(sql, (err, results) => {
-        if (err) return callback(err, null);
-        return callback(null, results);
-    });
+  db.query(sql, (err, results) => {
+    if (err) return callback(err, null);
+    return callback(null, results);
+  });
 };
 
 const addTeam = (teamData, callback) => {
@@ -70,12 +68,9 @@ const getAllDomains = (callback) => {
   db.query(sql, [], (err, results) => {
     if (err) return callback(err, null);
 
-   
-
     return callback(null, results);
   });
 };
-
 
 const getAllSubjectAreas = (callback) => {
   const query = `
@@ -103,7 +98,7 @@ const getAllSubjectAreas = (callback) => {
 
 const getAllActiveConsultants = (callback) => {
   const query = `
-    SELECT id, fld_name, fld_email, fld_phone 
+    SELECT id, fld_name, fld_email, fld_phone ,fld_username
     FROM tbl_admin 
     WHERE fld_admin_type = 'CONSULTANT' 
       AND status = 'Active' 
@@ -128,14 +123,12 @@ const getAllActiveConsultants = (callback) => {
 };
 
 module.exports = {
-   
-    getAllTeams,
-    getAllActiveTeams,
-    addTeam,
-    updateTeam,
-    updateTeamStatus,
-    getAllDomains,
-    getAllActiveConsultants,
-    getAllSubjectAreas,
-   
+  getAllTeams,
+  getAllActiveTeams,
+  addTeam,
+  updateTeam,
+  updateTeamStatus,
+  getAllDomains,
+  getAllActiveConsultants,
+  getAllSubjectAreas,
 };
