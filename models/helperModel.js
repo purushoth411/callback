@@ -98,7 +98,7 @@ const getAllSubjectAreas = (callback) => {
 
 const getAllActiveConsultants = (callback) => {
   const query = `
-    SELECT id, fld_name, fld_email, fld_phone ,fld_username
+    SELECT id, fld_name, fld_email, fld_phone ,fld_username,fld_permission
     FROM tbl_admin 
     WHERE fld_admin_type = 'CONSULTANT' 
       AND status = 'Active' 

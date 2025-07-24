@@ -528,19 +528,75 @@ const getMeetingId = (callback) => {
 
 
 
-const insertBooking = (bookingData, callback) => {
-  const fields = Object.keys(bookingData);
-  const values = Object.values(bookingData);
-  const placeholders = fields.map(() => '?').join(', ');
-  const query = `INSERT INTO tbl_booking (${fields.join(', ')}) VALUES (${placeholders})`;
+const insertBooking = (
+  bookingData,
+  crmId,
+  email,
+  sale_type = '',
+  consultantId = '',
+  forcePresalesAdd = '',
+  clientId = '',
+  callback
+) => {
+  const dbFields = [];
+  const dbValues = [];
+
+  let baseQuery = `SELECT * FROM tbl_booking WHERE fld_email = ?`;
+  dbValues.push(email);
+
+  if (sale_type === 'Presales') {
+    baseQuery += ` AND fld_client_id = ?`;
+    dbValues.push(clientId);
+
+    if (parseInt(consultantId) > 0) {
+      baseQuery += ` AND fld_consultantid = ?`;
+      dbValues.push(consultantId);
+    }
+
+    baseQuery += `
+      AND fld_sale_type = 'Presales'
+      AND fld_call_request_sts NOT IN ('Client did not join', 'Completed', 'Reject', 'Cancelled')
+      AND fld_consultation_sts NOT IN ('Reject', 'Client did not join')
+    `;
+  } else {
+    baseQuery += `
+      AND fld_addedby = ?
+      AND fld_call_request_sts NOT IN ('Client did not join', 'Completed', 'Reject', 'Cancelled')
+      AND fld_consultation_sts NOT IN ('Reject', 'Client did not join')
+    `;
+    dbValues.push(crmId);
+  }
+
+  baseQuery += ` AND callDisabled IS NULL`;
 
   db.getConnection((err, connection) => {
     if (err) return callback(err);
 
-    connection.query(query, values, (error, result) => {
-      connection.release();
-      if (error) return callback(error);
-      callback(null, result.insertId);
+    connection.query(baseQuery, dbValues, (selectErr, results) => {
+      if (selectErr) {
+        connection.release();
+        return callback(selectErr);
+      }
+
+      const allowInsert =
+        (results.length === 0 && email !== "") ||
+        (forcePresalesAdd === 'Yes' && sale_type === 'Presales');
+
+      if (allowInsert) {
+        const fields = Object.keys(bookingData);
+        const values = Object.values(bookingData);
+        const placeholders = fields.map(() => '?').join(', ');
+        const insertQuery = `INSERT INTO tbl_booking (${fields.join(', ')}) VALUES (${placeholders})`;
+
+        connection.query(insertQuery, values, (insertErr, result) => {
+          connection.release();
+          if (insertErr) return callback(insertErr);
+          return callback(null, result.insertId);
+        });
+      } else {
+        connection.release();
+        return callback(null, false); // same as `return false` in PHP
+      }
     });
   });
 };

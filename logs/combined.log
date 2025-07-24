@@ -255,3 +255,19 @@
 2025-07-16 23:34:53 | INFO | Server running on port 5000
 2025-07-16 23:34:55 | INFO | Server running on port 5000
 2025-07-16 23:35:04 | INFO | Server running on port 5000
+2025-07-24 21:15:36 | INFO | Server running on port 5000
+2025-07-24 21:19:12 | ERROR | TypeError: callback is not a function
+    at Query.<anonymous> (D:\React\callback\models\bookingModel.js:543:7)
+    at Query.<anonymous> (D:\React\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Query._callback (D:\React\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (D:\React\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+    at Query._handleFinalResultPacket (D:\React\callback\node_modules\mysql\lib\protocol\sequences\Query.js:149:8)
+    at Query.OkPacket (D:\React\callback\node_modules\mysql\lib\protocol\sequences\Query.js:74:10)
+    at Protocol._parsePacket (D:\React\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
+    at Parser._parsePacket (D:\React\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
+    at Parser.write (D:\React\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
+    at Protocol.write (D:\React\callback\node_modules\mysql\lib\protocol\Protocol.js:38:16)
+2025-07-24 21:53:27 | INFO | Server running on port 5000
+2025-07-24 22:15:57 | INFO | Server running on port 5000
+2025-07-24 22:16:00 | INFO | Server running on port 5000
+2025-07-24 22:16:27 | INFO | Server running on port 5000
