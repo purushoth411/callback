@@ -12,6 +12,11 @@ router.put('/update-team-status/:id', helperController.updateTeamStatus);
 router.get('/getAllDomains', helperController.getAllDomains);
 
 
+router.get('/getAllActiveConsultants', helperController.getAllActiveConsultants);
+router.get('/getAllSubjectAreas', helperController.getAllSubjectAreas);
+router.post('/getConsultantsBySubjectArea', helperController.getConsultantsBySubjectArea);
+
+
 
 
 
