@@ -145,6 +145,28 @@ const getAllActiveConsultants = (req, res) => {
   }
 };
 
+const getPlanDetails=(req,res)=>{
+  try{
+    helperModel.getPlanDetails((err,results)=>{
+       if (err) {
+        console.error("Error fetching plans:", err);
+        return res
+          .status(500)
+          .json({ status: false, message: "Database error" });
+      }
+
+      return res.json({ results });
+    })
+  }catch (err) {
+    console.error("Error in getting plans:", err);
+    return res
+      .status(404)
+      .json({ status: false, message: `Server error occurred in controller` });
+  }
+}
+
+
+
 // controllers/helperController.js
 const getConsultantsBySubjectArea = (req, res) => {
   const { subject_area } = req.body;
@@ -230,6 +252,35 @@ const getConsultantsBySubjectArea = (req, res) => {
   });
 };
 
+const fetchBookingDetailsWithRc = (req, res) => {
+   const id = req.query.id;
+  helperModel.getBookingDetailsWithRc(id,(err, bookingRow) => {
+    if (err) {
+      console.error("Error fetching booking details:", err);
+      return res.status(500).json({ status: false, message: "Database error" });
+    }
+
+    if (!bookingRow) {
+      return res.status(404).json({ status: false, message: "Booking not found" });
+    }
+
+    const consultantId = bookingRow.fld_consultantid;
+
+    helperModel.getConsultantSettingData(consultantId, (err2, settingRow) => {
+      if (err2) {
+        console.error("Error fetching consultant setting:", err2);
+        return res.status(500).json({ status: false, message: "Error fetching consultant settings" });
+      }
+
+      return res.json({
+        status: true,
+        bookingDetails: bookingRow,
+        consultantSettings: settingRow || {},
+      });
+    });
+  });
+};
+
 module.exports = {
   getAllActiveTeams,
   getAllTeams,
@@ -240,4 +291,6 @@ module.exports = {
   getAllSubjectAreas,
   getAllActiveConsultants,
   getConsultantsBySubjectArea,
+  getPlanDetails,
+  fetchBookingDetailsWithRc,
 };

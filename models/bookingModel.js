@@ -7,20 +7,16 @@ const getBookings = (userId, userType, assigned_team, filters, callback) => {
     SELECT 
       b.*,
       b.id AS booking_id,
-
       consultant.fld_name AS consultant_name,
       consultant.fld_email AS consultant_email,
-
       crm.fld_name AS crm_name,
       crm.fld_email AS crm_email,
-
       user.fld_name AS client_name,
       user.fld_email AS client_email,
       user.fld_phone AS client_phone,
       user.fld_city,
       user.fld_country
-    FROM 
-      tbl_booking b
+    FROM tbl_booking b
     LEFT JOIN tbl_admin consultant ON b.fld_consultantid = consultant.id
     LEFT JOIN tbl_admin crm ON b.fld_addedby = crm.id
     LEFT JOIN tbl_user user ON b.fld_userid = user.id
@@ -29,7 +25,7 @@ const getBookings = (userId, userType, assigned_team, filters, callback) => {
 
   const params = [];
 
-  const buildRemainingFiltersAndExecute = () => {
+  const buildFilters = () => {
     if (filters.status) {
       sql += ` AND b.status = ?`;
       params.push(filters.status);
@@ -68,15 +64,19 @@ const getBookings = (userId, userType, assigned_team, filters, callback) => {
         b.fld_booking_slot ASC
       LIMIT 500
     `;
+  };
 
+  const executeQuery = () => {
+    buildFilters();
     db.query(sql, params, (err, results) => {
-      if (err) return callback(err, null);
-      return callback(null, results);
+      if (err) return callback(err);
+      callback(null, results);
     });
   };
 
+  // Access control logic
   if (userType === "SUPERADMIN") {
-    buildRemainingFiltersAndExecute();
+    executeQuery();
   } else if (userType === "SUBADMIN" && assigned_team) {
     const teamIds = assigned_team
       .split(",")
@@ -84,47 +84,48 @@ const getBookings = (userId, userType, assigned_team, filters, callback) => {
       .filter(Boolean);
 
     if (teamIds.length > 0) {
-      const teamQuery = `SELECT team_members FROM tbl_teams WHERE id IN (${teamIds
-        .map(() => "?")
-        .join(",")})`;
+      const placeholders = teamIds.map(() => "?").join(",");
+      const teamQuery = `SELECT team_members FROM tbl_teams WHERE id IN (${placeholders})`;
 
-      db.query(teamQuery, teamIds, (err, teamResults) => {
-        if (err) return callback(err, null);
+      db.query(teamQuery, teamIds, (err, rows) => {
+        if (err) return callback(err);
 
         let teamUserIds = [];
-        teamResults.forEach((row) => {
+        rows.forEach((row) => {
           if (row.team_members) {
-            const members = row.team_members.split(",").map((id) => id.trim());
-            teamUserIds.push(...members);
+            teamUserIds.push(...row.team_members.split(",").map((id) => id.trim()));
           }
         });
 
-        const allUserIds = [...new Set([...teamUserIds, userId])];
-        const placeholders = allUserIds.map(() => "?").join(",");
+        const uniqueUserIds = [...new Set([...teamUserIds, String(userId)])];
+        if (uniqueUserIds.length === 0) return callback(null, []);
 
-        sql += ` AND (b.fld_consultantid IN (${placeholders}) OR b.fld_addedby IN (${placeholders}))`;
-        params.push(...allUserIds, ...allUserIds);
+        const uidPlaceholders = uniqueUserIds.map(() => "?").join(",");
+        sql += ` AND (b.fld_consultantid IN (${uidPlaceholders}) OR b.fld_addedby IN (${uidPlaceholders}))`;
+        params.push(...uniqueUserIds, ...uniqueUserIds);
 
-        buildRemainingFiltersAndExecute();
+        executeQuery();
       });
     } else {
       sql += ` AND (b.fld_consultantid = ? OR b.fld_addedby = ?)`;
       params.push(userId, userId);
-      buildRemainingFiltersAndExecute();
+      executeQuery();
     }
   } else if (userType === "CONSULTANT") {
     sql += ` AND b.fld_consultantid = ?`;
     params.push(userId);
-    buildRemainingFiltersAndExecute();
+    executeQuery();
   } else if (userType === "EXECUTIVE") {
     sql += ` AND b.fld_addedby = ?`;
     params.push(userId);
-    buildRemainingFiltersAndExecute();
+    executeQuery();
   } else {
-    sql += ` AND 1 = 0`; // fallback: no access
-    buildRemainingFiltersAndExecute();
+    // fallback - no access
+    sql += ` AND 1 = 0`;
+    executeQuery();
   }
 };
+
 
 const getBookingHistory = (bookingId, callback) => {
   const sql = `
@@ -206,7 +207,7 @@ const getPresaleClientDetails = (client_id, callback) => {
 };
 
 const getPostsaleClientDetails = (client_id, callback) => {
-  // First: Get student from tbl_scholar by student_code
+  // Step 1: Get student from tbl_scholar
   const studentSQL = `
     SELECT 
       st_id,
@@ -221,18 +222,14 @@ const getPostsaleClientDetails = (client_id, callback) => {
 
   rc_db.query(studentSQL, [client_id], (err, studentResult) => {
     if (err) return callback(err);
-
-    if (!studentResult || studentResult.length === 0) {
-      return callback(null, null); // No matching student
-    }
+    if (!studentResult || studentResult.length === 0) return callback(null, null);
 
     const student = studentResult[0];
     const st_id = student.st_id;
 
-    // Now: Fetch projects for this student
+    // Step 2: Get projects for the student
     const projectSQL = `
-      SELECT 
-        id, project_title 
+      SELECT id, project_title 
       FROM tbl_project 
       WHERE student_id = ?
     `;
@@ -240,19 +237,35 @@ const getPostsaleClientDetails = (client_id, callback) => {
     rc_db.query(projectSQL, [st_id], (err2, projectResults) => {
       if (err2) return callback(err2);
 
-      // Return both student and projects
-      const response = {
-        name: student.name,
-        email: student.email,
-        phone: student.phone,
-        address: student.address1,
-        projects: projectResults || [],
-      };
+      // Step 3: Get latest active plan_type
+      const planSQL = `
+        SELECT plan_type 
+        FROM tbl_clients_plan_upgrade 
+        WHERE client_id = ? AND status = 2 
+        ORDER BY id DESC 
+        LIMIT 1
+      `;
 
-      return callback(null, response);
+      rc_db.query(planSQL, [st_id], (err3, planResult) => {
+        if (err3) return callback(err3);
+
+        const plan_type = (planResult && planResult.length > 0) ? planResult[0].plan_type : null;
+
+        
+        const response = {
+          name: student.name,
+          email: student.email,
+          phone: student.phone,
+          projects: projectResults || [],
+          plan_type: plan_type,
+        };
+
+        return callback(null, response);
+      });
     });
   });
 };
+
 
 const getProjectMilestones = (projectId, callback) => {
   const sql = `
@@ -816,6 +829,35 @@ const updateRcCallRequestSts = async (callRequestId, rcCallRequestId, status, ca
   }
 };
 
+const getPostsaleCompletedCalls = (email, milestone_id, callback) => {
+  const query = `
+    SELECT COUNT(*) AS totalrow 
+    FROM tbl_booking 
+    WHERE fld_email = ? 
+      AND fld_call_request_sts = 'Completed'
+      AND fld_rc_milestoneid = ?
+  `;
+
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err, null);
+    }
+
+    connection.query(query, [email, milestone_id], (error, results) => {
+      connection.release();
+      if (error) {
+        console.error("Query error (completed calls):", error);
+        return callback(error, null);
+      }
+
+      return callback(null,results[0]); 
+    });
+  });
+};
+
+
+
 
 module.exports = {
   getBookings,
@@ -838,4 +880,5 @@ module.exports = {
   getAdmin,
   insertUser,
   updateRcCallRequestSts,
+  getPostsaleCompletedCalls,
 };

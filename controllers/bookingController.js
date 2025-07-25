@@ -1,5 +1,6 @@
 const bookingModel = require("../models/bookingModel");
-const crypto = require('crypto');
+const crypto = require("crypto");
+const logger = require("../logger");
 
 const fetchBookings = (req, res) => {
   const userId = req.user?.id || req.body.userId; // Assuming JWT middleware or fallback
@@ -273,20 +274,50 @@ const checkPresalesCall = (req, res) => {
   }
 };
 
-
 const insertCallRequest = (req, res) => {
   try {
     const {
-      name, email, phone, booking_date, que_counter, question_data,
-      consultant_id, crm_id, sale_type, project_milestone,
-      force_presales_add, completedCalls, allowedCalls,
-      requestMessage, client_plan_id, client_id,
-      call_related_to, rc_call_request_id, call_request_id
+      name,
+      email,
+      phone,
+      booking_date,
+      que_counter,
+      question_data,
+      consultant_id,
+      crm_id,
+      sale_type,
+      project_milestone,
+      project_milestone_name,
+      projectid,
+      force_presales_add,
+      completedCalls,
+      allowedCalls,
+      requestMessage,
+      client_plan_id,
+      client_id,
+      call_related_to,
+      rc_call_request_id,
+      call_request_id,
+      subject_area,
+      company_name,
+      asana_link,
+      internal_comments,
+      call_regarding,
+      topic_of_research,
+      insta_website,
+      secondary_consultant_id,
+      consultant_another_option,
+      add_call_by,
+      user,
     } = req.body;
 
-    const formatted_booking_date = booking_date ? new Date(booking_date).toISOString().split('T')[0] : null;
-    let question_data_string = (Array.isArray(question_data) && question_data.length > 0)
-      ? question_data.join("~~") : '';
+    const formatted_booking_date = booking_date
+      ? new Date(booking_date).toISOString().split("T")[0]
+      : null;
+    let question_data_string =
+      Array.isArray(question_data) && question_data.length > 0
+        ? question_data.join("~~")
+        : "";
 
     let str_answer_data = "";
     for (let i = 1; i <= que_counter; i++) {
@@ -297,19 +328,32 @@ const insertCallRequest = (req, res) => {
     str_answer_data = str_answer_data.replace(/\|~\|$/, "");
 
     // STEP 1: Check call request limit
-    bookingModel.getClientCallsRequestPlanLimitOver(email, "Yes", project_milestone, (err, limitResult) => {
-      if (err) return res.status(500).json({ status: false, message: "DB Error", error: err.message });
+    bookingModel.getClientCallsRequestPlanLimitOver(
+      email,
+      "Yes",
+      project_milestone,
+      (err, limitResult) => {
+        if (err)
+          return res
+            .status(500)
+            .json({ status: false, message: "DB Error", error: err.message });
 
-      if (limitResult && limitResult.totalrow > 0) {
-        return res.status(400).json({ status: false, message: "Add Call Request Already Sent!" });
-      }
+        if (limitResult && limitResult.totalrow > 0) {
+          return res
+            .status(400)
+            .json({ status: true, message: "Add Call Request Already Sent!" });
+        }
 
-      // STEP 2: Generate credentials
-      const password = generateRandomPassword();
-      const usercode = generateUserCode();
-      const verifycode = Math.floor(Math.random() * (99999 - 11111 + 1)) + 11111;
+        // STEP 2: Generate credentials
+        const password = generateRandomPassword();
+        const usercode = generateUserCode();
+        const verifycode =
+          Math.floor(Math.random() * (99999 - 11111 + 1)) + 11111;
 
-  const hashedPassword = crypto.createHash('md5').update(password).digest('hex');
+        const hashedPassword = crypto
+          .createHash("md5")
+          .update(password)
+          .digest("hex");
 
         const userData = {
           fld_password: hashedPassword,
@@ -319,114 +363,331 @@ const insertCallRequest = (req, res) => {
           fld_email: email.trim(),
           fld_phone: phone.trim(),
           fld_verify: verifycode,
-          fld_addedon: new Date()
+          fld_addedon: new Date(),
         };
 
         // STEP 3: Insert User
-        bookingModel.insertUser(userData, email, name, verifycode, (err, insertId) => {
-          if (err) return res.status(500).json({ status: false, message: "Insert user error", error: err.message });
-          if (!insertId) return res.status(400).json({ status: false, message: "User insert failed" });
+        bookingModel.insertUser(
+          userData,
+          email,
+          name,
+          verifycode,
+          (err, insertId) => {
+            if (err)
+              return res.status(500).json({
+                status: false,
+                message: "Insert user error",
+                error: err.message,
+              });
+            if (!insertId)
+              return res
+                .status(400)
+                .json({ status: false, message: "User insert failed" });
 
-          // STEP 4: Get Meeting ID
-          bookingModel.getMeetingId((err, meetingId) => {
-            if (err) return res.status(500).json({ status: false, message: "Meeting ID error" });
+            // STEP 4: Get Meeting ID
+            bookingModel.getMeetingId((err, meetingId) => {
+              if (err)
+                return res
+                  .status(500)
+                  .json({ status: false, message: "Meeting ID error" });
 
-            // STEP 5: Get Admin Info
-            const adminId = req.user?.admin_type === "SUPERADMIN" ? crm_id : req.user?.admin_id;
-            bookingModel.getAdmin(adminId, "EXECUTIVE", (err, adminInfo) => {
-              if (err){
-                console.error("Error fetching admin info:", err); 
-                return res.status(500).json({ status: false, message: "Admin info error" });
-              } 
-
-              const teamId = adminInfo?.fld_team_id;
-
-              // STEP 6: Create Booking Object
-              const bookingData = {
-                fld_userid: insertId,
-                fld_teamid: teamId,
-                fld_consultantid: consultant_id,
-                fld_name: name.trim(),
-                fld_email: email.trim(),
-                fld_phone: phone.trim(),
-                fld_sale_type: sale_type,
-                fld_bookingcode: meetingId,
-                fld_booking_date: formatted_booking_date,
-                fld_que_counter: que_counter,
-                fld_question_data: question_data_string,
-                fld_answer_data: str_answer_data,
-                fld_addedon: new Date(),
-                fld_call_request_sts: "Consultant Assigned",
-                fld_consultant_assigned_by_admin: "Yes",
-                fld_consultant_approve_sts: "Yes",
-                fld_addedby: adminId,
-              };
-
-              if (allowedCalls <= completedCalls && sale_type === "Postsales" && allowedCalls !== "Unlimited") {
-                bookingData.callDisabled = "Yes";
-              }
-
-              const force_presales_add_final = sale_type === "Postsales" ? '' : force_presales_add;
-
-              // STEP 7: Insert Booking
-              bookingModel.insertBooking(bookingData, adminId, email, sale_type, consultant_id, force_presales_add_final, client_id, (err, bookingId) => {
-                if (err) return res.status(500).json({ status: false, message: "Insert booking error" });
-
-                if (!bookingId) {
-                  return res.status(400).json({ status: false, message: "Booking already exists" });
+              // STEP 5: Get Admin Info
+              const adminId =
+                req.user?.fld_admin_type === "SUPERADMIN" ? crm_id : crm_id;
+              bookingModel.getAdmin(adminId, "EXECUTIVE", (err, adminInfo) => {
+                if (err) {
+                  console.error("Error fetching admin info:", err);
+                  return res
+                    .status(500)
+                    .json({ status: false, message: "Admin info error" });
                 }
 
-                // STEP 8: If request call needed
-                if ((allowedCalls <= completedCalls) && sale_type === "Postsales" && allowedCalls !== "Unlimited") {
-                  const addCallRequestData = {
-                    bookingId: bookingId,
-                    planId: client_plan_id,
-                    requestMessage: requestMessage,
-                    userId: req.user?.admin_id,
-                    addedon: new Date()
-                  };
+                const teamId = adminInfo?.fld_team_id;
 
-                  bookingModel.insertAddCallRequest(addCallRequestData, (err) => {
-                    if (err) return res.status(500).json({ status: false, message: "Add call request insert failed" });
-                  });
+                // STEP 6: Create Booking Object
+                const bookingData = {
+                  fld_userid: insertId,
+                  fld_teamid: teamId,
+                  fld_consultantid: consultant_id,
+                  fld_secondary_consultant_id: secondary_consultant_id,
+
+                  fld_name: name.trim(),
+                  fld_email: email.trim(),
+                  fld_phone: phone.trim(),
+                  fld_sale_type: sale_type,
+                  fld_bookingcode: meetingId,
+                  fld_booking_date: formatted_booking_date,
+                  fld_que_counter: que_counter,
+                  fld_question_data: question_data_string,
+                  fld_answer_data: str_answer_data,
+                  fld_addedon: new Date(),
+                  fld_call_request_sts: "Consultant Assigned",
+                  fld_consultant_assigned_by_admin: "Yes",
+                  fld_consultant_approve_sts: "Yes",
+                  fld_addedby: adminId,
+                  fld_call_related_to: call_related_to,
+                  fld_subject_area: subject_area,
+                  fld_company_name: company_name,
+                  fld_asana_link: asana_link,
+                  fld_internal_comments: internal_comments,
+                  fld_insta_website: insta_website,
+                  fld_call_regarding: call_regarding,
+                  fld_topic_of_research: topic_of_research,
+                  fld_consultant_another_option: consultant_another_option,
+                  fld_add_call_by: add_call_by,
+                  fld_rc_projectid: projectid,
+                  fld_rc_milestone_name: project_milestone_name,
+                  fld_rc_milestoneid: project_milestone,
+                  fld_client_id: client_id,
+                };
+
+                if (
+                  allowedCalls <= completedCalls &&
+                  sale_type === "Postsales" &&
+                  allowedCalls !== "Unlimited"
+                ) {
+                  bookingData.callDisabled = "Yes";
                 }
 
-                // STEP 9: Update RC call request status
-                if (call_request_id && rc_call_request_id) {
-                  bookingModel.updateRcCallRequestSts(call_request_id, rc_call_request_id, "Consultant Assigned", () => {});
-                }
+                const force_presales_add_final =
+                  sale_type === "Postsales" ? "" : force_presales_add;
 
-                return res.status(200).json({
-                  status: true,
-                  message: "Call Request Added Successfully",
-                  bookingId: bookingId,
-                  redirectTo: call_related_to === "I_am_not_sure" ? "/admin/viewexternalcall" : "/admin/viewbooking"
-                });
+                // STEP 7: Insert Booking
+                bookingModel.insertBooking(
+                  bookingData,
+                  adminId,
+                  email,
+                  sale_type,
+                  consultant_id,
+                  force_presales_add_final,
+                  client_id,
+                  (err, bookingId) => {
+                    if (err)
+                      return res.status(500).json({
+                        status: false,
+                        message: "Insert booking error",
+                      });
+
+                    if (!bookingId) {
+                      return res.status(400).json({
+                        status: false,
+                        message: "Booking already exists",
+                      });
+                    }
+
+                    // STEP 8: If request call needed
+                    if (
+                      allowedCalls <= completedCalls &&
+                      sale_type === "Postsales" &&
+                      allowedCalls !== "Unlimited"
+                    ) {
+                      logger.info(`This is a Request Call `);
+
+                      const addCallRequestData = {
+                        bookingId: bookingId,
+                        planId: client_plan_id,
+                        requestMessage: requestMessage,
+                        userId: crm_id,
+                        addedon: new Date(),
+                      };
+
+                      bookingModel.insertAddCallRequest(
+                        addCallRequestData,
+                        (err) => {
+                          if (err)
+                            return res.status(500).json({
+                              status: false,
+                              message: "Add call request insert failed",
+                            });
+                        }
+                      );
+                    }
+
+                    // STEP 9: Update RC call request status
+                    if (call_request_id && rc_call_request_id) {
+                      logger.info(`Rc Call request Update `);
+                      bookingModel.updateRcCallRequestSts(
+                        call_request_id,
+                        rc_call_request_id,
+                        "Consultant Assigned",
+                        () => {}
+                      );
+                    }
+
+                    if (call_related_to === "I_am_not_sure") {
+                      logger.info(`I am not sure `);
+                      const extCallData = {
+                        fld_booking_id: bookingId,
+                        fld_call_added_by: adminId,
+                        fld_consultation_sts: "Pending",
+                        fld_call_request_sts: "Pending",
+                        fld_added_on: new Date(),
+                      };
+
+                      bookingModel.insertExternalCall(extCallData, (err) => {
+                        if (err) {
+                          console.error(
+                            "External call insert failed:",
+                            err.message
+                          );
+                        }
+                      });
+
+                      const extComment = `External Call Assigned by CRM ${
+                        user?.fld_name || "CRM"
+                      } on ${getFormattedDate()} at ${getFormattedTime()}`;
+
+                      const extHistory = {
+                        fld_booking_id: bookingId,
+                        fld_comment: extComment,
+                        fld_notif_for: "SUBADMIN",
+                        fld_addedon: new Date(),
+                      };
+
+                      bookingModel.insertBookingHistory(extHistory, (err) => {
+                        if (err)
+                          console.error(
+                            "Error inserting external call history"
+                          );
+                      });
+
+                      // Also mark booking as external assigned
+                      bookingModel.updateBooking(
+                        bookingId,
+                        { fld_call_external_assign: "Yes" },
+                        () => {}
+                      );
+                    }
+
+                    // STEP 11: Booking history for consultants
+                    if (consultant_id) {
+                      const comment1 = `Call assigned for consultant ${consultant_id} by ${adminId} on ${getFormattedDate()} at ${getFormattedTime()}`;
+
+                      const history1 = {
+                        fld_booking_id: bookingId,
+                        fld_comment: comment1,
+                        fld_notif_for: "EXECUTIVE",
+                        fld_notif_for_id: user?.fld_admin_id || adminId,
+                        fld_addedon: new Date(),
+                      };
+
+                      bookingModel.insertBookingHistory(history1, (err) => {
+                        if (err)
+                          console.error(
+                            "Primary consultant history insert failed:",
+                            err.message
+                          );
+                      });
+                    }
+
+                    if (
+                      secondary_consultant_id &&
+                      secondary_consultant_id !== 0
+                    ) {
+                      const comment2 = `Call assigned for consultant ${secondary_consultant_id} by ${adminId} on ${getFormattedDate()} at ${getFormattedTime()}`;
+
+                      const history2 = {
+                        fld_booking_id: bookingId,
+                        fld_comment: comment2,
+                        fld_notif_for: "EXECUTIVE",
+                        fld_notif_for_id: user?.fld_admin_id || adminId,
+                        fld_addedon: new Date(),
+                      };
+
+                      bookingModel.insertBookingHistory(history2, (err) => {
+                        if (err)
+                          console.error(
+                            "Secondary consultant history insert failed:",
+                            err.message
+                          );
+                      });
+                    }
+
+                    return res.status(200).json({
+                      status: true,
+                      message: "Call Request Added Successfully",
+                      bookingId: bookingId,
+                      redirectTo:
+                        call_related_to === "I_am_not_sure"
+                          ? "/admin/viewexternalcall"
+                          : "/admin/viewbooking",
+                    });
+                  }
+                );
               });
             });
-          });
-        });
-    
-    });
+          }
+        );
+      }
+    );
   } catch (error) {
     console.error("Error in insertCallRequest:", error);
-    return res.status(500).json({ status: false, message: "Internal Server Error", error: error.message });
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
 
 function generateRandomPassword() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const nums = Math.floor(Math.random() * (999 - 111 + 1)) + 111;
-  return chars.charAt(Math.floor(Math.random() * chars.length)) + 
-         nums + 
-         chars.charAt(Math.floor(Math.random() * chars.length)) + 
-         chars.charAt(Math.floor(Math.random() * chars.length)) + 
-         Math.floor(Math.random() * (999 - 111 + 1)) + 111;
+  return (
+    chars.charAt(Math.floor(Math.random() * chars.length)) +
+    nums +
+    chars.charAt(Math.floor(Math.random() * chars.length)) +
+    chars.charAt(Math.floor(Math.random() * chars.length)) +
+    Math.floor(Math.random() * (999 - 111 + 1)) +
+    111
+  );
 }
 
 function generateUserCode() {
-  return 'USER' + Date.now();
+  return "USER" + Date.now();
 }
+
+function getFormattedDate() {
+  const d = new Date();
+  return d.toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function getFormattedTime() {
+  const d = new Date();
+  return d.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+
+const checkPostsaleCompletedCalls = (req, res) => {
+  try {
+    const { email, milestone_id } = req.body;
+
+    if (!email || !milestone_id) {
+      return res.status(400).json({
+        status: false,
+        message: "Email and milestone ID are required",
+      });
+    }
+
+    bookingModel.getPostsaleCompletedCalls(
+      email,
+      milestone_id,
+      (err, result) => {
+        if (err) {
+          console.error("Error fetching completed calls:", err);
+          return res
+            .status(500)
+            .json({ status: false, message: "Database error" });
+        }
+
+        return res.json({ status: true, result }); // result.totalrow is your count
+      }
+    );
+  } catch (error) {
+    console.error("Error in controller (checkPostsaleCompletedCalls):", error);
+    return res.status(500).json({ status: false, message: "Server error" });
+  }
+};
 
 module.exports = {
   fetchBookings,
@@ -439,4 +700,5 @@ module.exports = {
   checkConsultantTeamCondition,
   checkPresalesCall,
   insertCallRequest,
+  checkPostsaleCompletedCalls,
 };

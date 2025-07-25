@@ -13,6 +13,7 @@ router.post("/checkConsultantWebsiteCondition", bookingController.checkConsultan
 router.post("/checkConsultantTeamCondition", bookingController.checkConsultantTeamCondition);
 router.post("/checkPresalesCall", bookingController.checkPresalesCall);
 router.post("/addBooking", bookingController.insertCallRequest);
+router.post('/checkPostsaleCompletedCalls', bookingController.checkPostsaleCompletedCalls);
 
 
 

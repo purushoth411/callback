@@ -16,6 +16,10 @@ router.get('/getAllActiveConsultants', helperController.getAllActiveConsultants)
 router.get('/getAllSubjectAreas', helperController.getAllSubjectAreas);
 router.post('/getConsultantsBySubjectArea', helperController.getConsultantsBySubjectArea);
 
+router.get('/getPlanDetails', helperController.getPlanDetails);
+router.get("/getBookingDetailsWithRc", helperController.fetchBookingDetailsWithRc);
+
+
 
 
 
