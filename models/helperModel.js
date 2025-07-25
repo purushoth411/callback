@@ -205,6 +205,33 @@ const getConsultantSettingData = (consultantId, callback) => {
   });
 };
 
+const getUsersByRole = (role, status, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("Connection error:", err);
+      return callback(err);
+    }
+
+    let query = "SELECT id, fld_name FROM tbl_admin WHERE fld_admin_type = ?";
+    const params = [role];
+
+    if (status) {
+      query += " AND status = ?";
+      params.push(status);
+    }
+
+    connection.query(query, params, (err, results) => {
+      connection.release();
+
+      if (err) {
+        console.error("Query error:", err);
+        return callback(err);
+      }
+
+      callback(null, results);
+    });
+  });
+};
 
 
 module.exports = {
@@ -219,4 +246,5 @@ module.exports = {
   getPlanDetails,
   getBookingDetailsWithRc,
   getConsultantSettingData,
+  getUsersByRole,
 };

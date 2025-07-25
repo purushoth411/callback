@@ -25,46 +25,83 @@ const getBookings = (userId, userType, assigned_team, filters, callback) => {
 
   const params = [];
 
-  const buildFilters = () => {
-    if (filters.status) {
-      sql += ` AND b.status = ?`;
-      params.push(filters.status);
-    }
+ const buildFilters = () => {
+  // Booking status
+  if (Array.isArray(filters.consultationStatus) && filters.consultationStatus.length > 0) {
+    const placeholders = filters.consultationStatus.map(() => "?").join(",");
+    sql += ` AND b.fld_consultation_sts IN (${placeholders})`;
+    params.push(...filters.consultationStatus);
+  } else if (filters.consultationStatus) {
+    sql += ` AND b.fld_consultation_sts = ?`;
+    params.push(filters.consultationStatus);
+  }
 
-    if (filters.consultationStatus) {
-      sql += ` AND b.fld_consultation_sts = ?`;
-      params.push(filters.consultationStatus);
-    }
+  // Call recording status
+  if (filters.recordingStatus) {
+    sql += ` AND b.callRecordingSts = ?`;
+    params.push(filters.recordingStatus);
+  }
 
-    if (filters.fromDate && filters.toDate) {
-      sql += ` AND DATE(b.fld_booking_date) BETWEEN ? AND ?`;
-      params.push(filters.fromDate, filters.toDate);
-    }
+  // Sale Type (Presales, Postsales)
+  if (filters.sale_type) {
+    sql += ` AND b.fld_sale_type = ?`;
+    params.push(filters.sale_type);
+  }
 
-    if (filters.consultantId) {
-      sql += ` AND b.fld_consultantid = ?`;
-      params.push(filters.consultantId);
-    }
+  // Consultant
+  if (filters.consultantId) {
+    sql += ` AND b.fld_consultantid = ?`;
+    params.push(filters.consultantId);
+  }
 
-    if (filters.search) {
-      sql += ` AND (b.fld_name LIKE ? OR b.fld_email LIKE ?)`;
-      params.push(`%${filters.search}%`, `%${filters.search}%`);
-    }
+  // CRM
+  if (filters.crmId) {
+    sql += ` AND b.fld_addedby = ?`;
+    params.push(filters.crmId);
+  }
 
-    sql += `
-      ORDER BY 
-        CASE 
-          WHEN DATE(b.fld_booking_date) = CURDATE() THEN 1 
-          WHEN DATE(b.fld_booking_date) > CURDATE() THEN 2 
-          ELSE 3 
-        END ASC,
-        CASE 
-          WHEN DATE(b.fld_booking_date) < CURDATE() THEN b.fld_booking_date 
-        END DESC,
-        b.fld_booking_slot ASC
-      LIMIT 500
-    `;
-  };
+  // Keyword Search
+  if (filters.search) {
+    sql += ` AND (b.fld_name LIKE ? OR b.fld_email LIKE ?)`;
+    params.push(`%${filters.search}%`, `%${filters.search}%`);
+  }
+
+  // Date Range — uses filter_type to determine date field
+  if (filters.fromDate && filters.toDate) {
+    const dateField =
+      filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
+
+    sql += ` AND DATE(${dateField}) BETWEEN ? AND ?`;
+    params.push(filters.fromDate, filters.toDate);
+  } else if (filters.fromDate) {
+    const dateField =
+      filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
+
+    sql += ` AND DATE(${dateField}) >= ?`;
+    params.push(filters.fromDate);
+  } else if (filters.toDate) {
+    const dateField =
+      filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
+
+    sql += ` AND DATE(${dateField}) <= ?`;
+    params.push(filters.toDate);
+  }
+
+  // Ordering
+  sql += `
+    ORDER BY 
+      CASE 
+        WHEN DATE(b.fld_booking_date) = CURDATE() THEN 1 
+        WHEN DATE(b.fld_booking_date) > CURDATE() THEN 2 
+        ELSE 3 
+      END ASC,
+      CASE 
+        WHEN DATE(b.fld_booking_date) < CURDATE() THEN b.fld_booking_date 
+      END DESC,
+      b.fld_booking_slot ASC
+    LIMIT 500
+  `;
+};
 
   const executeQuery = () => {
     buildFilters();

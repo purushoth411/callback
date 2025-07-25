@@ -281,6 +281,24 @@ const fetchBookingDetailsWithRc = (req, res) => {
   });
 };
 
+const getUsersByRole = (req, res) => {
+  try {
+    const { role, status } = req.body;
+
+    helperModel.getUsersByRole(role, status, (err, results) => {
+      if (err) {
+        console.error("Error in getUsersByRole:", err);
+        return res.status(500).json({ status: false, message: "Database error" });
+      }
+
+      return res.json({ status: true, users: results });
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return res.status(500).json({ status: false, message: "Internal server error" });
+  }
+};
+
 module.exports = {
   getAllActiveTeams,
   getAllTeams,
@@ -293,4 +311,5 @@ module.exports = {
   getConsultantsBySubjectArea,
   getPlanDetails,
   fetchBookingDetailsWithRc,
+  getUsersByRole,
 };
