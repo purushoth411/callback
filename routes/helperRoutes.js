@@ -13,6 +13,7 @@ router.get('/getAllDomains', helperController.getAllDomains);
 
 
 router.get('/getAllActiveConsultants', helperController.getAllActiveConsultants);
+router.post('/getAdmin', helperController.getAdmin);
 router.get('/getAllSubjectAreas', helperController.getAllSubjectAreas);
 router.post('/getConsultantsBySubjectArea', helperController.getConsultantsBySubjectArea);
 

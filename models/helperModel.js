@@ -123,6 +123,38 @@ const getAllActiveConsultants = (callback) => {
   });
 };
 
+const getAdmin = (type, status, callback) => {
+  let query = `
+    SELECT * FROM tbl_admin
+    WHERE status = ?
+  `;
+  let params = [status];
+
+  if (type !== 'BOTH') {
+    query += ` AND fld_admin_type = ?`;
+    params.push(type);
+  } else {
+    query += ` AND fld_admin_type IN ('CONSULTANT', 'SUBADMIN')`;
+  }
+
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err, null);
+    }
+
+    connection.query(query, params, (error, results) => {
+      connection.release();
+      if (error) {
+        console.error("Query error (getAdmin):", error);
+        return callback(error, null);
+      }
+      return callback(null, results);
+    });
+  });
+};
+
+
 const getPlanDetails = (callback) => {
   const query = `
     SELECT *
@@ -468,4 +500,6 @@ module.exports = {
   fetchTimezones,
   getBookingData,
   getRcCallBookingRequest,
+
+  getAdmin
 };
