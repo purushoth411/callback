@@ -145,6 +145,24 @@ const getAllActiveConsultants = (req, res) => {
   }
 };
 
+const getAdmin = (req, res) => {
+  try {
+    const { type, status } = req.body;
+
+    helperModel.getAdmin(type, status, (err, results) => {
+      if (err) {
+        console.error("Error fetching admin list:", err);
+        return res.status(500).json({ status: false, message: "Database error" });
+      }
+
+      return res.json({ status: true, results });
+    });
+  } catch (err) {
+    console.error("Error in getAdmin controller:", err);
+    return res.status(500).json({ status: false, message: "Server error occurred in controller" });
+  }
+};
+
 const getPlanDetails=(req,res)=>{
   try{
     helperModel.getPlanDetails((err,results)=>{
@@ -312,4 +330,7 @@ module.exports = {
   getPlanDetails,
   fetchBookingDetailsWithRc,
   getUsersByRole,
+
+
+  getAdmin,
 };
