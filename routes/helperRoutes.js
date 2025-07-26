@@ -19,6 +19,9 @@ router.post('/getConsultantsBySubjectArea', helperController.getConsultantsBySub
 router.get('/getPlanDetails', helperController.getPlanDetails);
 router.get("/getBookingDetailsWithRc", helperController.fetchBookingDetailsWithRc);
 router.post("/getUsersByRole", helperController.getUsersByRole);
+router.get("/getTimezones", helperController.getTimezones);
+router.post("/getBookingData", helperController.getBookingData);
+router.post("/getRcCallBookingRequest", helperController.getRcCallBookingRequest);
 
 
 

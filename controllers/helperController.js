@@ -299,6 +299,60 @@ const getUsersByRole = (req, res) => {
   }
 };
 
+const getTimezones = (req, res) => {
+  const viewtype = req.query.viewtype || "";
+
+  try {
+    helperModel.fetchTimezones(viewtype, (err, timezones) => {
+      if (err) {
+        console.error("Error fetching timezones:", err);
+        return res.status(500).json({ status: false, message: "Database error" });
+      }
+
+      return res.status(200).json({ status: true, data: timezones });
+    });
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    return res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+const getBookingData = (req, res) => {
+  try {
+    const params = req.body;
+
+    helperModel.getBookingData(params, (err, result) => {
+      if (err) {
+        console.error("DB error:", err);
+        return res.status(500).json({ status: false, message: "Database error" });
+      }
+      return res.status(200).json({ status: true, data: result });
+    });
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    return res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+const getRcCallBookingRequest = (req, res) => {
+  try {
+    const params = req.body;
+
+    helperModel.getRcCallBookingRequest(params, (err, result) => {
+      if (err) {
+        console.error("DB error:", err);
+        return res.status(500).json({ status: false, message: "Database error" });
+      }
+      return res.status(200).json({ status: true, data: result });
+    });
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    return res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+
+
 module.exports = {
   getAllActiveTeams,
   getAllTeams,
@@ -312,4 +366,7 @@ module.exports = {
   getPlanDetails,
   fetchBookingDetailsWithRc,
   getUsersByRole,
+  getTimezones,
+  getBookingData,
+  getRcCallBookingRequest,
 };

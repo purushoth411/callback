@@ -1,5 +1,6 @@
 // models/helperModel.js
 const db = require("../config/db"); // Update path if needed
+const moment = require('moment-timezone');
 
 const getAllActiveTeams = (callback) => {
   const sql = `
@@ -233,6 +234,223 @@ const getUsersByRole = (role, status, callback) => {
   });
 };
 
+const fetchTimezones = (viewtype = "", callback) => {
+  try {
+    const tzList = moment.tz.names();
+    let formattedList = {};
+    let index = 1;
+
+    tzList.forEach((tz) => {
+      const now = moment().tz(tz);
+
+      if (viewtype === "show_custom_booking") {
+        formattedList[index] = tz;
+      } else {
+        const abbr = now.zoneAbbr(); // e.g., IST
+        const offset = now.format('Z'); // e.g., +05:30
+        const time = now.format('hh:mm A'); // e.g., 02:25 PM
+        formattedList[index] = `${tz}  ${abbr} ${offset}  ${time}`;
+      }
+
+      index++;
+    });
+
+    callback(null, formattedList);
+  } catch (error) {
+    callback(error, null);
+  }
+};
+
+
+
+const getBookingData = (params, callback) => {
+  try {
+    db.getConnection((err, connection) => {
+      if (err) return callback(err, null);
+
+      const {
+        bookingId = "",
+        consultantId = "",
+        userId = "",
+        selectedDate = "",
+        status = "",
+        orderBy = "DESC",
+        addedBy = "",
+        checkType = "",
+        selectedSlot = "",
+        callExternalAssign = "",
+        showAcceptedCall = "",
+        verifyOtpUrl = "",
+        hideSubOption = "",
+        clientId = "",
+        disabledBookingId = ""
+      } = params;
+
+      let sql = `
+        SELECT 
+          b.*, 
+          a.fld_client_code AS admin_code, a.fld_name AS admin_name, a.fld_email AS admin_email, a.fld_profile_image, 
+          a.fld_client_code AS consultant_code, 
+          u.fld_user_code AS user_code, u.fld_name AS user_name, u.fld_email AS user_email, 
+          u.fld_decrypt_password AS user_pass, u.fld_country_code AS user_country_code, u.fld_phone AS user_phone, 
+          u.fld_address, u.fld_city, u.fld_pincode, u.fld_country
+        FROM tbl_booking b
+        LEFT JOIN tbl_admin a ON b.fld_consultantid = a.id
+        LEFT JOIN tbl_user u ON b.fld_userid = u.id
+        WHERE b.callDisabled IS NULL
+      `;
+
+      const values = [];
+
+      if (bookingId) {
+        sql += " AND b.id = ?";
+        values.push(bookingId);
+      }
+
+      if (consultantId && checkType !== 'CHECK_BOTH') {
+        sql += " AND b.fld_consultantid = ?";
+        values.push(consultantId);
+      }
+
+      if (checkType === 'CHECK_BOTH') {
+        sql += " AND (b.fld_consultantid = ? OR b.fld_secondary_consultant_id = ? OR b.fld_third_consultantid = ?)";
+        values.push(consultantId, consultantId, consultantId);
+      }
+
+      if (addedBy) {
+        sql += " AND b.fld_addedby = ?";
+        values.push(addedBy);
+      }
+
+      if (userId) {
+        sql += " AND b.fld_userid = ?";
+        values.push(userId);
+      }
+
+      if (clientId) {
+        sql += " AND b.fld_client_id = ? AND b.id != ?";
+        values.push(clientId, disabledBookingId || 0);
+      }
+
+      if (status === "Reject") {
+        sql += " AND b.fld_consultation_sts != 'Reject' AND b.fld_consultation_sts != 'Rescheduled'";
+      }
+
+      if (showAcceptedCall === "Yes") {
+        sql += " AND b.fld_consultation_sts = 'Accept'";
+      }
+
+      if (verifyOtpUrl) {
+        sql += " AND b.fld_verify_otp_url = ?";
+        values.push(verifyOtpUrl);
+      }
+
+      if (status === "Completed") {
+        sql += " AND b.fld_consultation_sts = 'Completed'";
+      }
+
+      if (selectedDate) {
+        sql += " AND b.fld_booking_date = ?";
+        values.push(selectedDate);
+      }
+
+      if (selectedSlot) {
+        sql += " AND b.fld_booking_slot = ?";
+        values.push(selectedSlot);
+      }
+
+      if (callExternalAssign) {
+        sql += " AND b.fld_call_external_assign = ?";
+        values.push(callExternalAssign);
+      }
+
+      if (hideSubOption) {
+        sql += " AND (b.fld_consultant_another_option = 'CONSULTANT' OR b.fld_consultant_another_option IS NULL)";
+      }
+
+      sql += ` ORDER BY b.id ${orderBy}`;
+
+      connection.query(sql, values, (err, results) => {
+        connection.release();
+        if (err) return callback(err, null);
+        return callback(null, bookingId ? results[0] : results);
+      });
+    });
+  } catch (error) {
+    return callback(error, null);
+  }
+};
+
+const getRcCallBookingRequest = (params, callback) => {
+  try {
+    db.getConnection((err, connection) => {
+      if (err) return callback(err, null);
+
+      const {
+        id = "",
+        crmId = "",
+        consultantId = "",
+        selectedDate = "",
+        selectedSlot = "",
+        status = ""
+      } = params;
+
+      let sql = `
+        SELECT 
+          r.*, 
+          b.id AS bookingid, 
+          crm.fld_name 
+        FROM tbl_rc_call_booking_request r 
+        LEFT JOIN tbl_booking b ON r.id = b.fld_call_request_id 
+        LEFT JOIN tbl_admin crm ON r.crmid = crm.id 
+        WHERE r.reqFrom = 'RC'
+      `;
+
+      const values = [];
+
+      if (crmId) {
+        sql += " AND r.crmid = ?";
+        values.push(crmId);
+      }
+
+      if (id) {
+        sql += " AND r.id = ?";
+        values.push(id);
+      }
+
+      if (selectedDate) {
+        sql += " AND r.booking_date = ?";
+        values.push(selectedDate);
+      }
+
+      if (selectedSlot) {
+        sql += " AND r.slot_time = ?";
+        values.push(selectedSlot);
+      }
+
+      if (consultantId) {
+        sql += " AND r.consultantid = ?";
+        values.push(consultantId);
+      }
+
+      if (status) {
+        sql += " AND r.call_request_sts = ?";
+        values.push(status);
+      }
+
+      sql += " ORDER BY r.id DESC";
+
+      connection.query(sql, values, (err, results) => {
+        connection.release();
+        if (err) return callback(err, null);
+        return callback(null, id ? results[0] : results);
+      });
+    });
+  } catch (error) {
+    return callback(error, null);
+  }
+};
+
 
 module.exports = {
   getAllTeams,
@@ -247,4 +465,7 @@ module.exports = {
   getBookingDetailsWithRc,
   getConsultantSettingData,
   getUsersByRole,
+  fetchTimezones,
+  getBookingData,
+  getRcCallBookingRequest,
 };
