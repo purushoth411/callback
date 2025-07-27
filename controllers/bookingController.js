@@ -1,6 +1,8 @@
 const bookingModel = require("../models/bookingModel");
+const helperModel = require("../models/helperModel");
 const crypto = require("crypto");
 const logger = require("../logger");
+const moment = require("moment-timezone");
 
 const fetchBookings = (req, res) => {
   const userId = req.user?.id || req.body.userId; // Assuming JWT middleware or fallback
@@ -689,6 +691,148 @@ const checkPostsaleCompletedCalls = (req, res) => {
   }
 };
 
+
+
+
+const saveCallScheduling = (req, res) => {
+  const {
+    bookingId,
+    consultantId,
+    bookingDate,
+    slot,
+    timezone,
+    callLink,
+    secondaryConsultantId,
+  } = req.body;
+
+  if (!bookingId || !consultantId || !bookingDate || !slot) {
+    return res.json({ status: false, message: "Missing required data." });
+  }
+
+  const booking_date = moment(bookingDate).format("YYYY-MM-DD");
+  const booking_slot = slot;
+  const slcttimezone = timezone;
+  const call_joining_link = callLink;
+
+  const bookingData = {
+    fld_booking_date: booking_date,
+    fld_booking_slot: booking_slot,
+    fld_timezone: slcttimezone,
+    fld_call_joining_link: call_joining_link,
+    fld_call_request_sts: "Call Scheduled",
+    fld_addedon: moment().format("YYYY-MM-DD HH:mm:ss"),
+  };
+
+  // Step 1: Update Booking
+  bookingModel.updateBooking(bookingId, bookingData, (err) => {
+    if (err) return res.json({ status: false, message: "Failed to update booking." });
+
+    // Step 2: Get Consultant Info
+    helperModel.getAdminById(consultantId, (err, admin) => {
+      if (err || !admin) return res.json({ status: false, message: "Consultant not found." });
+
+      const comment = `Call scheduled by ${admin.fld_name} on ${moment().format("DD MMM YYYY")} at ${moment().format("hh:mm a")}`;
+
+      const historyData = {
+        fld_booking_id: bookingId,
+        fld_comment: comment,
+        fld_notif_for: admin.fld_admin_type,
+        fld_notif_for_id: consultantId,
+        fld_addedon: moment().format("YYYY-MM-DD"),
+      };
+
+      // Step 3: Insert Primary Consultant History
+      bookingModel.insertBookingHistory(historyData, (err) => {
+        if (err) return res.json({ status: false, message: "Failed to insert history log." });
+
+        // Step 4: Secondary Consultant (if passed)
+        if (secondaryConsultantId) {
+          helperModel.getAdminById(secondaryConsultantId, (err, secAdmin) => {
+            if (err || !secAdmin) {
+              return res.json({
+                status: true,
+                message: "Call scheduled, but failed to load secondary consultant.",
+              });
+            }
+
+            const secComment = `Call scheduled by ${admin.fld_name} for secondary consultant on ${moment().format("DD MMM YYYY")} at ${moment().format("hh:mm a")}`;
+
+            const secHistory = {
+              fld_booking_id: bookingId,
+              fld_comment: secComment,
+              fld_notif_for: secAdmin.fld_admin_type,
+              fld_notif_for_id: consultantId, // still notifying primary consultant?
+              fld_addedon: moment().format("YYYY-MM-DD"),
+            };
+
+            bookingModel.insertBookingHistory(secHistory, (err) => {
+              if (err) {
+                return res.json({
+                  status: true,
+                  message: "Call scheduled, but failed to log secondary consultant history.",
+                });
+              }
+
+              return res.json({ status: true, message: "Call scheduled successfully." });
+            });
+          });
+        } else {
+          return res.json({ status: true, message: "Call scheduled successfully." });
+        }
+      });
+    });
+  });
+};
+
+
+const fetchBookingById = (req, res) => {
+  try {
+    const { bookingId } = req.body;
+
+    if (!bookingId) {
+      return res.status(400).json({ status: false, message: "Booking ID required" });
+    }
+
+    bookingModel.getBookingById(bookingId, (err, result) => {
+      if (err) {
+        console.error("DB Error:", err);
+        return res.status(500).json({ status: false, message: "Database error" });
+      }
+
+      if (result.length === 0) {
+        return res.status(404).json({ status: false, message: "Booking not found" });
+      }
+
+      res.status(200).json({ status: true, data: result[0] });
+    });
+  } catch (error) {
+    console.error("Catch Error:", error);
+    res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+const deleteBookingById = (req, res) => {
+  const { bookingId } = req.body;
+
+  if (!bookingId) {
+    return res.json({ status: false, message: "Booking ID is required" });
+  }
+
+  bookingModel.deleteBookingById(bookingId, (err, result) => {
+    if (err) {
+      console.error("Delete booking error:", err);
+      return res.status(500).json({ status: false, message: "Server error" });
+    }
+
+    if (result.affectedRows > 0) {
+      return res.json({ status: true, message: "Booking deleted successfully" });
+    } else {
+      return res.json({ status: false, message: "Booking not found or already deleted" });
+    }
+  });
+};
+
+
 module.exports = {
   fetchBookings,
   getBookingHistory,
@@ -701,4 +845,7 @@ module.exports = {
   checkPresalesCall,
   insertCallRequest,
   checkPostsaleCompletedCalls,
+  saveCallScheduling,
+  fetchBookingById,
+  deleteBookingById,
 };

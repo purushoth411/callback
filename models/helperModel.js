@@ -364,7 +364,7 @@ const getBookingData = (params, callback) => {
         values.push(clientId, disabledBookingId || 0);
       }
 
-      if (status === "Reject") {
+      if (status == "Reject") {
         sql += " AND b.fld_consultation_sts != 'Reject' AND b.fld_consultation_sts != 'Rescheduled'";
       }
 
@@ -483,6 +483,20 @@ const getRcCallBookingRequest = (params, callback) => {
   }
 };
 
+const getAdminById = (adminId, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(
+      "SELECT * FROM tbl_admin WHERE id = ?",
+      [adminId],
+      (error, results) => {
+        connection.release();
+        callback(error, results[0]);
+      }
+    );
+  });
+};
 
 module.exports = {
   getAllTeams,
@@ -501,5 +515,6 @@ module.exports = {
   getBookingData,
   getRcCallBookingRequest,
 
-  getAdmin
+  getAdmin,
+  getAdminById,
 };
