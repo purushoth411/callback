@@ -1,6 +1,8 @@
 // controllers/dashboardController.js
 const dashboardModel = require("../models/dashboardModel");
 const db = require("../config/db");
+const moment = require('moment');
+
 
 const getAllActiveTeams = (req, res) => {
   dashboardModel.getAllActiveTeams((err, teams) => {
@@ -108,9 +110,56 @@ const getConsultantSettingData = (req, res) => {
   });
 };
 
+const saveConsultantSettings = (req, res) => {
+  const {
+    consultantid,
+    timezone,
+    selectedWeekDays,
+    saturdayOff,
+    exclusions,
+    timeData = {}
+  } = req.body;
+
+  // Basic validation
+  if (!consultantid || !timezone?.id) {
+    return res.status(400).json({ status: false, message: "Missing required fields" });
+  }
+
+  const data = {
+    fld_timezone: timezone.id || null,
+    fld_selected_week_days: selectedWeekDays || null,
+    fld_saturday_off: saturdayOff || null,
+    fld_days_exclusion: exclusions || null,
+
+    fld_sun_time_data: timeData.sun_time_data ?? null,
+    fld_mon_time_data: timeData.mon_time_data ?? null,
+    fld_tue_time_data: timeData.tue_time_data ?? null,
+    fld_wed_time_data: timeData.wed_time_data ?? null,
+    fld_thu_time_data: timeData.thu_time_data ?? null,
+    fld_fri_time_data: timeData.fri_time_data ?? null,
+    fld_sat_time_data: timeData.sat_time_data ?? null,
+
+    fld_updatedon: moment().format("YYYY-MM-DD HH:mm:ss")
+  };
+
+  dashboardModel.updateConsultantSettings(consultantid, data, (err, result) => {
+    if (err) {
+      console.error("Update error:", err);
+      return res.status(500).json({ status: false, message: "Database update failed" });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: "Consultant settings updated successfully",
+    });
+  });
+};
+
+
 module.exports = {
     getAllActiveTeams,
     getCallStatistics,
     getParticularStatusCallsOfCrm,
-    getConsultantSettingData
+    getConsultantSettingData,
+    saveConsultantSettings
 }

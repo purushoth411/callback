@@ -25,6 +25,7 @@ const userRoutes = require('./routes/userRoutes');
 const helperRoutes = require('./routes/helperRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const additionalRoutes = require('./routes/additionalRoutes');
 
 
 app.use('/api/users', userRoutes);
@@ -32,6 +33,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/helpers', helperRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/additional', additionalRoutes);
 
 
 

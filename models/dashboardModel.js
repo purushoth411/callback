@@ -182,10 +182,36 @@ const getConsultantSettingData = (consultantid = "", callback) => {
   });
 };
 
+const updateConsultantSettings = (consultantid, data, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    const fields = Object.keys(data)
+      .map((key) => `${key} = ?`)
+      .join(', ');
+
+    const values = Object.values(data);
+    values.push(consultantid); // For WHERE clause
+
+    const sql = `
+      UPDATE tbl_consultant_setting
+      SET ${fields}
+      WHERE fld_consultantid = ?
+    `;
+
+    connection.query(sql, values, (error, result) => {
+      connection.release();
+      if (error) return callback(error);
+      return callback(null, result);
+    });
+  });
+};
+
 
 module.exports = {
   getAllActiveTeams,
   getTotalData,
   getParticularStatusCallsOfCrm,
-  getConsultantSettingData
+  getConsultantSettingData,
+  updateConsultantSettings
 }

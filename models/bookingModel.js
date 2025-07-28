@@ -126,10 +126,18 @@ const getBookings = (userId, userType, assigned_team, filters, dashboard_status,
 
   const executeQuery = () => {
     buildFilters();
-    db.query(sql, params, (err, results) => {
-      if (err) return callback(err);
-      callback(null, results);
-    });
+    db.getConnection((err, connection) => {
+      if (err) {
+        console.error("DB connection error:", err);
+        return callback(err, null);
+      }
+      connection.query(sql, params, (err, results) => {
+        connection.release();
+        if (err) return callback(err);
+        callback(null, results);
+      });
+    })
+
   };
 
   // Access control logic
@@ -145,25 +153,32 @@ const getBookings = (userId, userType, assigned_team, filters, dashboard_status,
       const placeholders = teamIds.map(() => "?").join(",");
       const teamQuery = `SELECT team_members FROM tbl_teams WHERE id IN (${placeholders})`;
 
-      db.query(teamQuery, teamIds, (err, rows) => {
-        if (err) return callback(err);
+      db.getConnection((err, connection) => {
+        if (err) {
+          console.error("DB connection error:", err);
+          return callback(err, null);
+        }
+        connection.query(teamQuery, teamIds, (err, rows) => {
+          connection.release();
+          if (err) return callback(err);
 
-        let teamUserIds = [];
-        rows.forEach((row) => {
-          if (row.team_members) {
-            teamUserIds.push(...row.team_members.split(",").map((id) => id.trim()));
-          }
+          let teamUserIds = [];
+          rows.forEach((row) => {
+            if (row.team_members) {
+              teamUserIds.push(...row.team_members.split(",").map((id) => id.trim()));
+            }
+          });
+
+          const uniqueUserIds = [...new Set([...teamUserIds, String(userId)])];
+          if (uniqueUserIds.length === 0) return callback(null, []);
+
+          const uidPlaceholders = uniqueUserIds.map(() => "?").join(",");
+          sql += ` AND (b.fld_consultantid IN (${uidPlaceholders}) OR b.fld_addedby IN (${uidPlaceholders}))`;
+          params.push(...uniqueUserIds, ...uniqueUserIds);
+
+          executeQuery();
         });
-
-        const uniqueUserIds = [...new Set([...teamUserIds, String(userId)])];
-        if (uniqueUserIds.length === 0) return callback(null, []);
-
-        const uidPlaceholders = uniqueUserIds.map(() => "?").join(",");
-        sql += ` AND (b.fld_consultantid IN (${uidPlaceholders}) OR b.fld_addedby IN (${uidPlaceholders}))`;
-        params.push(...uniqueUserIds, ...uniqueUserIds);
-
-        executeQuery();
-      });
+      })
     } else {
       sql += ` AND (b.fld_consultantid = ? OR b.fld_addedby = ?)`;
       params.push(userId, userId);
@@ -203,10 +218,17 @@ const getBookingHistory = (bookingId, callback) => {
     ORDER BY fld_addedon DESC
   `;
 
-  db.query(sql, [bookingId], (err, results) => {
-    if (err) return callback(err, null);
-    return callback(null, results);
-  });
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err, null);
+    }
+    connection.query(sql, [bookingId], (err, results) => {
+      connection.release();
+      if (err) return callback(err, null);
+      return callback(null, results);
+    });
+  })
 };
 
 // Get Presales client details from InstaCRM
@@ -224,105 +246,134 @@ const getPresaleClientDetails = (client_id, callback) => {
     LIMIT 1
   `;
 
-  instacrm_db.query(queryAssignSQL, [client_id], (err, assignResult) => {
-    if (err) return callback(err);
-
-    if (!assignResult || assignResult.length === 0) {
-      return callback(null, null); // No assignment found
+  instacrm_db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err, null);
     }
+    connection.query(queryAssignSQL, [client_id], (err, assignResult) => {
+      connection.release();
+      if (err) return callback(err);
 
-    const { query_id, insta_website, company_name } = assignResult[0];
-
-    // Step 2: Get query details from tbl_query
-    const queryDetailsSQL = `
-      SELECT 
-        name,
-        email_id AS email,
-        alt_email_id,
-        phone
-      
-      FROM tbl_query 
-      WHERE id = ? 
-      LIMIT 1
-    `;
-
-    instacrm_db.query(queryDetailsSQL, [query_id], (err2, queryResult) => {
-      if (err2) return callback(err2);
-
-      if (!queryResult || queryResult.length === 0) {
-        return callback(null, null); // Query found, but no data
+      if (!assignResult || assignResult.length === 0) {
+        return callback(null, null); // No assignment found
       }
 
-      const queryData = queryResult[0];
+      const { query_id, insta_website, company_name } = assignResult[0];
 
-      // Step 3: Attach website and company info from assignment join
-      queryData.insta_website = insta_website || null;
-      queryData.assigned_company = company_name || null;
-
-      return callback(null, queryData);
+      // Step 2: Get query details from tbl_query
+      const queryDetailsSQL = `
+        SELECT 
+          name,
+          email_id AS email,
+          alt_email_id,
+          phone
+        
+        FROM tbl_query 
+        WHERE id = ? 
+        LIMIT 1
+      `;
+      instacrm_db.getConnection((err, connection) => {
+        if (err) {
+          console.error("DB connection error:", err);
+          return callback(err, null);
+        }
+        connection.query(queryDetailsSQL, [query_id], (err2, queryResult) => {
+          connection.release();
+          if (err2) return callback(err2);
+  
+          if (!queryResult || queryResult.length === 0) {
+            return callback(null, null); // Query found, but no data
+          }
+  
+          const queryData = queryResult[0];
+  
+          // Step 3: Attach website and company info from assignment join
+          queryData.insta_website = insta_website || null;
+          queryData.assigned_company = company_name || null;
+  
+          return callback(null, queryData);
+        });
+      })
     });
-  });
+  })
 };
 
 const getPostsaleClientDetails = (client_id, callback) => {
-  // Step 1: Get student from tbl_scholar
-  const studentSQL = `
-    SELECT 
-      st_id,
-      st_name AS name,
-      st_email AS email,
-      contact_no AS phone,
-      address1
-    FROM tbl_scholar 
-    WHERE student_code = ? 
-    LIMIT 1
-  `;
+  rc_db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err);
+    }
 
-  rc_db.query(studentSQL, [client_id], (err, studentResult) => {
-    if (err) return callback(err);
-    if (!studentResult || studentResult.length === 0) return callback(null, null);
-
-    const student = studentResult[0];
-    const st_id = student.st_id;
-
-    // Step 2: Get projects for the student
-    const projectSQL = `
-      SELECT id, project_title 
-      FROM tbl_project 
-      WHERE student_id = ?
+    const studentSQL = `
+      SELECT 
+        st_id,
+        st_name AS name,
+        st_email AS email,
+        contact_no AS phone,
+        address1
+      FROM tbl_scholar 
+      WHERE student_code = ? 
+      LIMIT 1
     `;
 
-    rc_db.query(projectSQL, [st_id], (err2, projectResults) => {
-      if (err2) return callback(err2);
+    connection.query(studentSQL, [client_id], (err1, studentResult) => {
+      if (err1) {
+        connection.release();
+        return callback(err1);
+      }
 
-      // Step 3: Get latest active plan_type
-      const planSQL = `
-        SELECT plan_type 
-        FROM tbl_clients_plan_upgrade 
-        WHERE client_id = ? AND status = 2 
-        ORDER BY id DESC 
-        LIMIT 1
+      if (!studentResult || studentResult.length === 0) {
+        connection.release();
+        return callback(null, null);
+      }
+
+      const student = studentResult[0];
+      const st_id = student.st_id;
+
+      const projectSQL = `
+        SELECT id, project_title 
+        FROM tbl_project 
+        WHERE student_id = ?
       `;
 
-      rc_db.query(planSQL, [st_id], (err3, planResult) => {
-        if (err3) return callback(err3);
+      connection.query(projectSQL, [st_id], (err2, projectResults) => {
+        if (err2) {
+          connection.release();
+          return callback(err2);
+        }
 
-        const plan_type = (planResult && planResult.length > 0) ? planResult[0].plan_type : null;
+        const planSQL = `
+          SELECT plan_type 
+          FROM tbl_clients_plan_upgrade 
+          WHERE client_id = ? AND status = 2 
+          ORDER BY id DESC 
+          LIMIT 1
+        `;
 
+        connection.query(planSQL, [st_id], (err3, planResult) => {
+          connection.release(); // ✅ release after final query
 
-        const response = {
-          name: student.name,
-          email: student.email,
-          phone: student.phone,
-          projects: projectResults || [],
-          plan_type: plan_type,
-        };
+          if (err3) return callback(err3);
 
-        return callback(null, response);
+          const plan_type = (planResult && planResult.length > 0) ? planResult[0].plan_type : null;
+
+          const response = {
+            name: student.name,
+            email: student.email,
+            phone: student.phone,
+            projects: projectResults || [],
+            plan_type: plan_type,
+          };
+
+          return callback(null, response);
+        });
       });
     });
   });
 };
+
 
 
 const getProjectMilestones = (projectId, callback) => {

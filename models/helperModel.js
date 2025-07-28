@@ -8,10 +8,17 @@ const getAllActiveTeams = (callback) => {
     WHERE status = 'Active'
     ORDER BY fld_addedon DESC
   `;
-  db.query(sql, (err, results) => {
-    if (err) return callback(err, null);
-    return callback(null, results);
-  });
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err, null);
+    }
+    connection.query(sql, (err, results) => {
+      connection.release()
+      if (err) return callback(err, null);
+      return callback(null, results);
+    });
+  })
 };
 
 const getAllTeams = (callback) => {
@@ -24,34 +31,71 @@ const getAllTeams = (callback) => {
         ORDER BY 
             tbl_team.fld_addedon DESC
     `;
-
-  db.query(sql, (err, results) => {
-    if (err) return callback(err, null);
-    return callback(null, results);
-  });
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err, null);
+    }
+    connection.query(sql, (err, results) => {
+      connection.release();
+      if (err) return callback(err, null);
+      return callback(null, results);
+    });
+  })
 };
 
 const addTeam = (teamData, callback) => {
   const sql = `INSERT INTO tbl_team (fld_title, fld_addedon, status) VALUES (?, NOW(), 'Active')`;
-  db.query(sql, [teamData.team], (err, result) => {
-    if (err) return callback(err);
-    return callback(null, result);
-  });
+
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err, null);
+    }
+    connection.query(sql, [teamData.team], (err, result) => {
+      connection.release();
+      if (err) return callback(err);
+      return callback(null, result);
+    });
+  })
+
 };
 
 const updateTeam = (id, teamData, callback) => {
   const sql = `UPDATE tbl_team SET fld_title = ? WHERE id = ?`;
-  db.query(sql, [teamData.team, id], (err, result) => {
-    if (err) return callback(err);
-    return callback(null, result);
-  });
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err, null);
+    }
+    connection.query(sql, [teamData.team, id], (err, result) => {
+      connection.release();
+      if (err) return callback(err);
+      return callback(null, result);
+    });
+  })
 };
 
 const updateTeamStatus = (teamId, status, callback) => {
   const sql = `UPDATE tbl_team SET status = ? WHERE id = ?`;
   const params = [status, teamId];
 
-  db.query(sql, params, callback);
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err, null);
+    }
+
+    connection.query(sql, params, (queryErr, results) => {
+      connection.release(); // release AFTER query completes
+      if (queryErr) {
+        console.error("Query error:", queryErr);
+        return callback(queryErr, null);
+      }
+
+      callback(null, results);
+    });
+  });
 };
 
 const getAllDomains = (callback) => {
@@ -65,12 +109,19 @@ const getAllDomains = (callback) => {
     FROM tbl_domain_pref
     ORDER BY id DESC
   `;
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err, null);
+    }
+    connection.query(sql, [], (err, results) => {
+      connection.release();
+      if (err) return callback(err, null);
+  
+      return callback(null, results);
+    });
+  })
 
-  db.query(sql, [], (err, results) => {
-    if (err) return callback(err, null);
-
-    return callback(null, results);
-  });
 };
 
 const getAllSubjectAreas = (callback) => {
@@ -198,10 +249,10 @@ const getBookingDetailsWithRc = (id, callback) => {
       values.push(id);
     }
 
- 
+
     sql += ` ORDER BY b.id DESC`;
     if (!id) {
-      
+
     }
 
     connection.query(sql, values, (error, results) => {
@@ -209,9 +260,9 @@ const getBookingDetailsWithRc = (id, callback) => {
       if (error) return callback(error);
 
       if (id) {
-        callback(null, results.length ? results[0] : null); 
+        callback(null, results.length ? results[0] : null);
       } else {
-        callback(null, results); 
+        callback(null, results);
       }
     });
   });
