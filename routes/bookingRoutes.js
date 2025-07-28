@@ -22,7 +22,7 @@ router.post("/updateStatusByCrm", bookingController.updateStatusByCrm);
 router.get("/getBookingData", bookingController.getBookingData);
 router.post("/markAsConfirmByClient", bookingController.markAsConfirmByClient);
 router.post("/reassignComment", bookingController.reassignComment);
-
+router.get("/getExternalCallByBookingId", bookingController.getExternalCallByBookingId);
 
 
 

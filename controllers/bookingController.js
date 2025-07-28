@@ -943,7 +943,7 @@ const updateStatusByCrm = (req, res) => {
       .json({ status: false, message: "Invalid request data" });
   }
 
-  bookingModel.getBookingById(bookingid, (err, bookingInfo) => {
+  bookingModel.getBookingRowById(bookingid, (err, bookingInfo) => {
     if (err)
       return res.status(500).json({ status: false, message: "Database error" });
     if (!bookingInfo)
@@ -1042,7 +1042,7 @@ const markAsConfirmByClient = (req, res) => {
   }
 
   try {
-    bookingModel.getBookingById(bookingId, (err, booking) => {
+    bookingModel.getBookingRowById(bookingId, (err, booking) => {
       if (err || !booking) {
         return res.status(500).json({
           status: false,
@@ -1287,7 +1287,7 @@ const reassignComment = (req, res) => {
             });
           }
 
-          bookingModel.getBookingById(bookingId, (err, booking) => {
+          bookingModel.getBookingRowById(bookingId, (err, booking) => {
             if (
               booking &&
               booking.fld_consultantid &&
@@ -1334,6 +1334,32 @@ const reassignComment = (req, res) => {
  
 };
 
+const getExternalCallByBookingId = (req, res) => {
+  const bookingId = parseInt(req.query.bookingId);
+  const id = req.query.id ? parseInt(req.query.id) : 0;
+
+  if (!bookingId) {
+    return res.status(400).json({
+      status: false,
+      message: "Booking ID is required",
+    });
+  }
+
+  bookingModel.getExternalCallInfo(id, bookingId, (err, data) => {
+    if (err) {
+      console.error("DB Error:", err);
+      return res.status(500).json({
+        status: false,
+        message: "Database error",
+      });
+    }
+
+    return res.json({
+      status: true,
+      data: data,
+    });
+  });
+};
 
 module.exports = {
   fetchBookings,
@@ -1355,4 +1381,5 @@ module.exports = {
   getBookingData,
   markAsConfirmByClient,
   reassignComment,
+  getExternalCallByBookingId,
 };

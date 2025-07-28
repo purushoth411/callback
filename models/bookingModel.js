@@ -978,6 +978,40 @@ const getBookingById = (bookingId, callback) => {
     const query = `
       SELECT 
         b.*,
+        a1.fld_client_code AS crm_client_code,
+        a1.fld_name AS crm_name,
+        a1.fld_email AS crm_email,
+        a2.fld_client_code AS consultant_client_code,
+        a2.fld_name AS consultant_name,
+        a2.fld_email AS consultant_email,
+        a3.fld_client_code AS sec_consultant_client_code,
+        a3.fld_name AS sec_consultant_name,
+        a3.fld_email AS sec_consultant_email,
+        u.fld_name AS user_name,
+        u.fld_email AS user_email,
+        u.fld_phone AS user_phone
+      FROM tbl_booking b
+      LEFT JOIN tbl_admin a1 ON b.fld_addedby = a1.id
+      LEFT JOIN tbl_admin a2 ON b.fld_consultantid = a2.id
+      LEFT JOIN tbl_admin a3 ON b.fld_secondary_consultant_id = a3.id
+      LEFT JOIN tbl_user u ON b.fld_userid = u.id
+      WHERE b.id = ?
+    `;
+
+    connection.query(query, [bookingId], (err, results) => {
+      connection.release();
+      callback(err, results);
+    });
+  });
+};
+
+const getBookingRowById = (bookingId, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err, null);
+
+    const query = `
+      SELECT 
+        b.*,
         a1.fld_name AS crm_name,
         a1.fld_email AS crm_email,
         a2.fld_name AS consultant_name,
@@ -1000,6 +1034,7 @@ const getBookingById = (bookingId, callback) => {
     });
   });
 };
+
 
 
 const deleteBookingById = (bookingId, callback) => {
@@ -1188,7 +1223,42 @@ const submitReassignComment = (bookingid, reassign_comment, callback) => {
   });
 };
 
+const getExternalCallInfo = (id = 0, bookingId = 0, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
 
+    try {
+      let query = `SELECT * FROM tbl_external_calls WHERE 1=1`;
+      const params = [];
+
+      if (id > 0) {
+        query += ` AND id = ?`;
+        params.push(id);
+      }
+
+      if (bookingId > 0) {
+        query += ` AND fld_booking_id = ?`;
+        params.push(bookingId);
+      }
+
+      query += ` ORDER BY id DESC LIMIT 1`;
+
+      connection.query(query, params, (error, results) => {
+        connection.release();
+
+        if (error) return callback(error);
+        if (results.length > 0) {
+          callback(null, results[0]);
+        } else {
+          callback(null, null); // No record found
+        }
+      });
+    } catch (error) {
+      connection.release();
+      callback(error);
+    }
+  });
+};
 
 module.exports = {
   getBookings,
@@ -1215,7 +1285,9 @@ module.exports = {
   updateRcCallRequestSts,
   getPostsaleCompletedCalls,
   getBookingById,
+  getBookingRowById,
   deleteBookingById,
   getAllCrmIds,
   getBookingData,
+  getExternalCallInfo,
 };
