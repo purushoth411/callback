@@ -1218,7 +1218,7 @@ const markAsConfirmByClient = (req, res) => {
               const body = `Hi ${crm.fld_name}, <br/><br/>The client ${booking.fld_name} with booking id ${booking.fld_bookingcode} has confirmed the call and will be available.<br/><br/>Thanks & regards,<br/>${process.env.WEBNAME}<br/>`;
 
               const from = process.env.MAIL_FROM || "donotreply@rapidcollaborate.com";
-              const to = "web@thesisindia.net";
+              const to = "rkip4112001@gmail.com";
               const bcc = "";
 
               mailSending.sendMail(from, to, subject, body, bcc, (err, result) => {
@@ -1245,6 +1245,95 @@ const markAsConfirmByClient = (req, res) => {
   }
 };
 
+const reassignComment = (req, res) => {
+  
+    const bookingId = req.body.bookingid;
+    const reassignComment = req.body.reassign_comment;
+    const user=req.body.user;
+    try{
+
+    if (bookingId > 0 && reassignComment !== "") {
+      const updateData = {
+        fld_reassign_comment: reassignComment,
+        fld_call_request_sts: "Reassign Request",
+      };
+
+      bookingModel.updateBooking(bookingId, updateData, (err) => {
+        if (err) {
+          return res.status(500).json({
+            status: false,
+            message: "Failed to submit call reassign comment!",
+          });
+        }
+
+        const get_current_date = moment().format("DD MMM YYYY");
+        const get_current_time = moment().format("hh:mm a");
+
+        const comment = `Call reassign request to another consultant by ${user.fld_name} on ${get_current_date} at ${get_current_time}`;
+
+        const historyData = {
+          fld_booking_id: bookingId,
+          fld_comment: comment,
+          fld_notif_for: "SUPERADMIN",
+          fld_notif_for_id: 1,
+          fld_addedon: new Date(),
+        };
+
+        bookingModel.insertBookingHistory(historyData, (historyErr) => {
+          if (historyErr) {
+            return res.status(500).json({
+              status: false,
+              message: "Failed to insert reassign comment history!",
+            });
+          }
+
+          bookingModel.getBookingById(bookingId, (err, booking) => {
+            if (
+              booking &&
+              booking.fld_consultantid &&
+              booking.fld_call_request_id &&
+              booking.fld_rc_call_request_id
+            ) {
+              bookingModel.updateRcCallRequestSts(
+                booking.fld_call_request_id,
+                booking.fld_rc_call_request_id,
+                "Reassign Request",
+                (rcErr) => {
+                  if (rcErr) {
+                    return res.status(500).json({
+                      status: false,
+                      message: "Failed to update RC Call Request status",
+                    });
+                  }
+
+                  return res.status(200).json({
+                    status: true,
+                    message: "Call reassign comment submitted successfully",
+                  });
+                }
+              );
+            } else {
+              return res.status(200).json({
+                status: true,
+                message: "Call reassign comment submitted successfully",
+              });
+            }
+          });
+        });
+      });
+    } else {
+      return res.status(400).json({
+        status: false,
+        message: "Missing bookingId or reassign comment",
+      });
+    }
+  }catch (error) {
+    console.error("Exception in Reassign Comment:", error);
+    res.status(500).json({ status: false, message: "Unexpected error" });
+  }
+ 
+};
+
 
 module.exports = {
   fetchBookings,
@@ -1265,4 +1354,5 @@ module.exports = {
   updateStatusByCrm,
   getBookingData,
   markAsConfirmByClient,
+  reassignComment,
 };

@@ -2,57 +2,88 @@
 const db = require("../config/db"); // Update path if needed
 const moment = require("moment-timezone");
 
+// Get all active teams
 const getAllActiveTeams = (callback) => {
-  const sql = `
-    SELECT * FROM tbl_team
-    WHERE status = 'Active'
-    ORDER BY fld_addedon DESC
-  `;
-  db.query(sql, (err, results) => {
+  db.getConnection((err, connection) => {
     if (err) return callback(err, null);
-    return callback(null, results);
-  });
-};
 
-const getAllTeams = (callback) => {
-  const sql = `
-        SELECT 
-          *
-        FROM 
-            tbl_team 
-       
-        ORDER BY 
-            tbl_team.fld_addedon DESC
+    const sql = `
+      SELECT * FROM tbl_team
+      WHERE status = 'Active'
+      ORDER BY fld_addedon DESC
     `;
 
-  db.query(sql, (err, results) => {
+    connection.query(sql, (queryErr, results) => {
+      connection.release(); // Always release the connection
+      if (queryErr) return callback(queryErr, null);
+      return callback(null, results);
+    });
+  });
+};
+
+// Get all teams
+const getAllTeams = (callback) => {
+  db.getConnection((err, connection) => {
     if (err) return callback(err, null);
-    return callback(null, results);
+
+    const sql = `
+      SELECT * FROM tbl_team
+      ORDER BY fld_addedon DESC
+    `;
+
+    connection.query(sql, (queryErr, results) => {
+      connection.release();
+      if (queryErr) return callback(queryErr, null);
+      return callback(null, results);
+    });
   });
 };
 
+// Add a new team
 const addTeam = (teamData, callback) => {
-  const sql = `INSERT INTO tbl_team (fld_title, fld_addedon, status) VALUES (?, NOW(), 'Active')`;
-  db.query(sql, [teamData.team], (err, result) => {
+  db.getConnection((err, connection) => {
     if (err) return callback(err);
-    return callback(null, result);
+
+    const sql = `INSERT INTO tbl_team (fld_title, fld_addedon, status) VALUES (?, NOW(), 'Active')`;
+
+    connection.query(sql, [teamData.team], (queryErr, result) => {
+      connection.release();
+      if (queryErr) return callback(queryErr);
+      return callback(null, result);
+    });
   });
 };
 
+// Update team title
 const updateTeam = (id, teamData, callback) => {
-  const sql = `UPDATE tbl_team SET fld_title = ? WHERE id = ?`;
-  db.query(sql, [teamData.team, id], (err, result) => {
+  db.getConnection((err, connection) => {
     if (err) return callback(err);
-    return callback(null, result);
+
+    const sql = `UPDATE tbl_team SET fld_title = ? WHERE id = ?`;
+
+    connection.query(sql, [teamData.team, id], (queryErr, result) => {
+      connection.release();
+      if (queryErr) return callback(queryErr);
+      return callback(null, result);
+    });
   });
 };
 
+// Update team status
 const updateTeamStatus = (teamId, status, callback) => {
-  const sql = `UPDATE tbl_team SET status = ? WHERE id = ?`;
-  const params = [status, teamId];
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
 
-  db.query(sql, params, callback);
+    const sql = `UPDATE tbl_team SET status = ? WHERE id = ?`;
+
+    connection.query(sql, [status, teamId], (queryErr, result) => {
+      connection.release();
+      if (queryErr) return callback(queryErr);
+      return callback(null, result);
+    });
+  });
 };
+
 
 const getAllDomains = (callback) => {
   const sql = `
@@ -66,12 +97,24 @@ const getAllDomains = (callback) => {
     ORDER BY id DESC
   `;
 
-  db.query(sql, [], (err, results) => {
-    if (err) return callback(err, null);
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error (getAllDomains):", err);
+      return callback(err, null);
+    }
 
-    return callback(null, results);
+    connection.query(sql, [], (error, results) => {
+      connection.release(); // Important to release the connection
+      if (error) {
+        console.error("Query error (getAllDomains):", error);
+        return callback(error, null);
+      }
+
+      return callback(null, results);
+    });
   });
 };
+
 
 const getAllSubjectAreas = (callback) => {
   const query = `

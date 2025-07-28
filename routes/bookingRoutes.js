@@ -21,6 +21,7 @@ router.post("/setAsConverted", bookingController.setAsConverted);
 router.post("/updateStatusByCrm", bookingController.updateStatusByCrm);
 router.get("/getBookingData", bookingController.getBookingData);
 router.post("/markAsConfirmByClient", bookingController.markAsConfirmByClient);
+router.post("/reassignComment", bookingController.reassignComment);
 
 
 
