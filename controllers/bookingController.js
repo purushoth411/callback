@@ -832,6 +832,63 @@ const deleteBookingById = (req, res) => {
   });
 };
 
+const setAsConverted = (req, res) => {
+  const {
+    bookingId,
+    rcCode,
+    projectId,
+    user
+  } = req.body;
+
+  if (!bookingId || !rcCode || !projectId) {
+    return res.json({ status: false, message: "Missing required data." });
+  }
+
+  const bookingData = {
+    fld_converted_sts: "Yes",
+  };
+
+  // Step 1: Update Booking
+  bookingModel.updateBooking(bookingId, bookingData, (err) => {
+    if (err) return res.json({ status: false, message: "Failed to update booking." });
+
+    // Step 2: Get Admin Info
+    helperModel.getAdminById(user.id, (err, admin) => {
+      if (err || !admin) return res.json({ status: false, message: "Admin not found." });
+
+      const currentDate = moment().format("DD MMM YYYY");
+      const currentTime = moment().format("hh:mm a");
+
+      const comment = `Call status set as converted by ${admin.fld_name} on ${currentDate} at ${currentTime}. RC Code - ${rcCode}, Project Id - ${projectId}`;
+
+      // Step 3: Insert Booking Overall History
+      const historyData = {
+        fld_booking_id: bookingId,
+        fld_comment: comment,
+        fld_addedon: moment().format("YYYY-MM-DD")
+      };
+
+      bookingModel.insertBookingHistory(historyData, (err) => {
+        if (err) return res.json({ status: false, message: "Failed to insert history log." });
+
+        // Step 4: Insert Booking Status History
+        const statusHistoryData = {
+          fld_booking_id: bookingId,
+          status: "Converted",
+          fld_comment: comment
+        };
+
+        bookingModel.insertBookingStatusHistory(statusHistoryData, (err) => {
+          if (err) return res.json({ status: false, message: "Failed to insert status history." });
+
+          return res.json({ status: true, message: "Marked as converted successfully." });
+        });
+      });
+    });
+  });
+};
+
+
 
 module.exports = {
   fetchBookings,
@@ -848,4 +905,5 @@ module.exports = {
   saveCallScheduling,
   fetchBookingById,
   deleteBookingById,
+  setAsConverted,
 };

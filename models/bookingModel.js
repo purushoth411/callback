@@ -777,6 +777,25 @@ const insertBookingHistory = (data, callback) => {
   });
 };
 
+const insertBookingStatusHistory = (data, callback) => {
+  const fields = Object.keys(data);
+  const values = Object.values(data);
+  const placeholders = fields.map(() => '?').join(', ');
+  const query = `INSERT INTO tbl_booking_sts_history (${fields.join(', ')}) VALUES (${placeholders})`;
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(query, values, (error, result) => {
+      connection.release();
+      if (error) return callback(error);
+
+      callback(null, result.insertId);
+    });
+  });
+};
+
+
 const getAdmin = (adminId, adminType, callback) => {
   let query = 'SELECT * FROM tbl_admin WHERE id = ?';
   const params = [adminId];
@@ -797,6 +816,28 @@ const getAdmin = (adminId, adminType, callback) => {
     });
   });
 };
+
+const getAdminById = (adminId, callback) => {
+  if (!adminId) return callback(new Error("Admin ID is required"));
+
+  const query = 'SELECT * FROM tbl_admin WHERE id = ?';
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(query, [adminId], (error, results) => {
+      connection.release();
+      if (error) return callback(error);
+
+      if (results.length > 0) {
+        callback(null, results[0]);
+      } else {
+        callback(null, null); // No admin found
+      }
+    });
+  });
+};
+
 
 
 
@@ -965,7 +1006,9 @@ module.exports = {
   insertAddCallRequest,
   insertExternalCall,
   insertBookingHistory,
+  insertBookingStatusHistory,
   getAdmin,
+  getAdminById,
   insertUser,
   updateRcCallRequestSts,
   getPostsaleCompletedCalls,
