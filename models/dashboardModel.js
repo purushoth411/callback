@@ -159,16 +159,33 @@ const getParticularStatusCallsOfCrm = (crm_id, status, callback) => {
   });
 };
 
-module.exports = {
-  getParticularStatusCallsOfCrm
+
+const getConsultantSettingData = (consultantid = "", callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err, null);
+
+    let sql = `SELECT * FROM tbl_consultant_setting`;
+    const params = [];
+
+    if (consultantid && Number(consultantid) > 0) {
+      sql += ` WHERE fld_consultantid = ?`;
+      params.push(consultantid);
+    }
+
+    sql += ` ORDER BY id DESC LIMIT 1`;
+
+    connection.query(sql, params, (error, results) => {
+      connection.release();
+      if (error) return callback(error, null);
+      return callback(null, results[0] || null);
+    });
+  });
 };
-
-
-
 
 
 module.exports = {
   getAllActiveTeams,
   getTotalData,
-  getParticularStatusCallsOfCrm
+  getParticularStatusCallsOfCrm,
+  getConsultantSettingData
 }

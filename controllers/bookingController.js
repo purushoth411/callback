@@ -9,6 +9,7 @@ const fetchBookings = (req, res) => {
   const userType = req.user?.type || req.body.userType;
   const assigned_team = req.user?.assigned_team || req.body.assigned_team;
   const filters = req.body.filters || {};
+  const dashboard_status = req.body.dashboard_status || null;
 
   // Validate required fields
   if (!userId || !userType) {
@@ -18,11 +19,13 @@ const fetchBookings = (req, res) => {
     });
   }
 
+
   bookingModel.getBookings(
     userId,
     userType,
     assigned_team,
     filters,
+    dashboard_status,
     (err, bookings) => {
       if (err) {
         console.error("Booking Fetch Error:", err);
