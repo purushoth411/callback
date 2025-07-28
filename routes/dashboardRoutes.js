@@ -5,5 +5,6 @@ const dashboardController = require('../controllers/dashboardController');
 
 router.get('/getAllActiveTeams', dashboardController.getAllActiveTeams);
 router.post('/getcall_statistics', dashboardController.getCallStatistics);
+router.post('/getparticularstatuscalls', dashboardController.getParticularStatusCallsOfCrm);
 
 module.exports = router

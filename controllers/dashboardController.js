@@ -69,7 +69,30 @@ const getCallStatistics = async (req, res) => {
   }
 };
 
+const getParticularStatusCallsOfCrm = (req, res) => {
+  const { crm_id, status } = req.body;
+
+  if ( !status) {
+    return res.status(400).json({ status: false, message: 'Missing status' });
+  }
+
+  dashboardModel.getParticularStatusCallsOfCrm(crm_id, status, (err, data) => {
+    if (err) {
+      console.error('DB Error:', err);
+      return res.status(500).json({ status: false, message: 'Server error' });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Success',
+      data: data.length > 0 ? data : []
+    });
+  });
+};
+
+
 module.exports = {
     getAllActiveTeams,
-    getCallStatistics
+    getCallStatistics,
+    getParticularStatusCallsOfCrm
 }
