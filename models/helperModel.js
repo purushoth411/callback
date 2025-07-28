@@ -498,6 +498,34 @@ const getAdminById = (adminId, callback) => {
   });
 };
 
+const getMessagesByBookingId = (bookingId, callback) => {
+    db.getConnection((err, connection) => {
+      if (err) {
+        console.error("Connection error:", err);
+        return callback(err, null);
+      }
+
+      const query = `
+        SELECT tbl_booking_chat.* , tbl_admin.fld_name as sender_name 
+        FROM tbl_booking_chat
+        LEFT JOIN tbl_admin ON tbl_booking_chat.fld_sender_id = tbl_admin.id
+        WHERE tbl_booking_chat.fld_bookingid = ?
+        ORDER BY tbl_booking_chat.fld_addedon DESC
+      `;
+
+      connection.query(query, [bookingId], (queryErr, results) => {
+        connection.release(); // Always release the connection
+
+        if (queryErr) {
+          console.error("Query error:", queryErr);
+          return callback(queryErr, null);
+        }
+
+        return callback(null, results);
+      });
+    });
+  }
+
 module.exports = {
   getAllTeams,
   getAllActiveTeams,
@@ -517,4 +545,5 @@ module.exports = {
 
   getAdmin,
   getAdminById,
+  getMessagesByBookingId,
 };

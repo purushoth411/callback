@@ -23,6 +23,7 @@ router.post("/getUsersByRole", helperController.getUsersByRole);
 router.get("/getTimezones", helperController.getTimezones);
 router.post("/getBookingData", helperController.getBookingData);
 router.post("/getRcCallBookingRequest", helperController.getRcCallBookingRequest);
+router.get("/getMessageData", helperController.getMessageData);
 
 
 

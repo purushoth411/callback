@@ -369,6 +369,28 @@ const getRcCallBookingRequest = (req, res) => {
   }
 };
 
+const getMessageData = (req, res) => {
+  try {
+    const { bookingId } = req.query;
+
+    if (!bookingId) {
+      return res.status(400).json({ status: false, message: "Missing bookingId" });
+    }
+
+    helperModel.getMessagesByBookingId(bookingId, (err, messages) => {
+      if (err) {
+        console.error("Error fetching messages:", err);
+        return res.status(500).json({ status: false, message: "Database error" });
+      }
+
+      return res.status(200).json({ status: true, messages });
+    });
+
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return res.status(500).json({ status: false, message: "Unexpected server error" });
+  }
+};
 
 
 module.exports = {
@@ -390,4 +412,5 @@ module.exports = {
 
 
   getAdmin,
+  getMessageData,
 };
