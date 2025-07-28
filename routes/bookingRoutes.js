@@ -14,6 +14,9 @@ router.post("/checkConsultantTeamCondition", bookingController.checkConsultantTe
 router.post("/checkPresalesCall", bookingController.checkPresalesCall);
 router.post("/addBooking", bookingController.insertCallRequest);
 router.post('/checkPostsaleCompletedCalls', bookingController.checkPostsaleCompletedCalls);
+router.post('/saveCallScheduling', bookingController.saveCallScheduling);
+router.post("/fetchBookingById", bookingController.fetchBookingById);
+router.post("/deleteBookingById", bookingController.deleteBookingById);
 
 
 

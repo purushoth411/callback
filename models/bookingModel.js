@@ -893,6 +893,57 @@ const getPostsaleCompletedCalls = (email, milestone_id, callback) => {
   });
 };
 
+const getBookingById = (bookingId, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err, null);
+
+    const query = `
+      SELECT 
+        b.*,
+        a1.fld_name AS crm_name,
+        a1.fld_email AS crm_email,
+        a2.fld_name AS consultant_name,
+        a2.fld_email AS consultant_email,
+        a3.fld_name AS sec_consultant_name,
+        a3.fld_email AS sec_consultant_email,
+        u.fld_name AS client_name,
+        u.fld_email AS client_email
+      FROM tbl_booking b
+      LEFT JOIN tbl_admin a1 ON b.fld_addedby = a1.id
+      LEFT JOIN tbl_admin a2 ON b.fld_consultantid = a2.id
+      LEFT JOIN tbl_admin a3 ON b.fld_secondary_consultant_id = a3.id
+      LEFT JOIN tbl_user u ON b.fld_userid = u.id
+      WHERE b.id = ?
+    `;
+
+    connection.query(query, [bookingId], (err, results) => {
+      connection.release();
+      callback(err, results);
+    });
+  });
+};
+
+
+const deleteBookingById = (bookingId, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error('DB connection error:', err);
+      return callback(err, null);
+    }
+
+    const query = "DELETE FROM tbl_booking WHERE id = ?";
+    connection.query(query, [bookingId], (error, result) => {
+      connection.release(); // always release connection after use
+
+      if (error) {
+        console.error('Delete query error:', error);
+        return callback(error, null);
+      }
+
+      callback(null, result);
+    });
+  });
+};
 
 
 
@@ -918,4 +969,6 @@ module.exports = {
   insertUser,
   updateRcCallRequestSts,
   getPostsaleCompletedCalls,
+  getBookingById,
+  deleteBookingById,
 };
