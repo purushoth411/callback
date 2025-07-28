@@ -163,3 +163,80 @@
     at Protocol._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
     at Parser._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
     at Parser.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
+2025-07-28 15:09:04 | ERROR | ReferenceError: sendMail is not defined
+    at C:\Users\Admin\Pictures\callback\controllers\helperController.js:445:9
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\models\helperModel.js:550:9)
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Query._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+    at Query._handleFinalResultPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:149:8)
+    at Query.OkPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:74:10)
+    at Protocol._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
+    at Parser._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
+    at Parser.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
+2025-07-28 15:48:53 | ERROR | TypeError: bookingModel.getAllCrmIds is not a function
+    at C:\Users\Admin\Pictures\callback\controllers\bookingController.js:930:20
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\models\bookingModel.js:688:7)
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Query._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+    at Query._handleFinalResultPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:149:8)
+    at Query.OkPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:74:10)
+    at Protocol._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
+    at Parser._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
+    at Parser.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
+2025-07-28 18:10:06 | ERROR | Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
+    at ServerResponse.setHeader (node:_http_outgoing:659:11)
+    at ServerResponse.header (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:684:10)
+    at ServerResponse.send (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:161:12)
+    at ServerResponse.json (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:250:15)
+    at C:\Users\Admin\Pictures\callback\controllers\bookingController.js:1150:30
+    at C:\Users\Admin\Pictures\callback\models\bookingModel.js:683:21
+    at Handshake.onConnect (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Pool.js:58:9)
+    at Handshake.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Handshake._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+2025-07-28 18:16:27 | ERROR | Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
+    at ServerResponse.setHeader (node:_http_outgoing:659:11)
+    at ServerResponse.header (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:684:10)
+    at ServerResponse.send (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:161:12)
+    at ServerResponse.json (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:250:15)
+    at C:\Users\Admin\Pictures\callback\controllers\bookingController.js:1150:46
+    at C:\Users\Admin\Pictures\callback\models\bookingModel.js:683:21
+    at Handshake.onConnect (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Pool.js:58:9)
+    at Handshake.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Handshake._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+2025-07-28 18:20:16 | ERROR | Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
+    at ServerResponse.setHeader (node:_http_outgoing:659:11)
+    at ServerResponse.header (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:684:10)
+    at ServerResponse.send (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:161:12)
+    at ServerResponse.json (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:250:15)
+    at C:\Users\Admin\Pictures\callback\controllers\bookingController.js:1150:36
+    at C:\Users\Admin\Pictures\callback\models\bookingModel.js:683:21
+    at Handshake.onConnect (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Pool.js:58:9)
+    at Handshake.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Handshake._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+2025-07-28 18:22:11 | ERROR | Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
+    at ServerResponse.setHeader (node:_http_outgoing:659:11)
+    at ServerResponse.header (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:684:10)
+    at ServerResponse.send (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:161:12)
+    at ServerResponse.json (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:250:15)
+    at C:\Users\Admin\Pictures\callback\controllers\bookingController.js:1150:36
+    at C:\Users\Admin\Pictures\callback\models\bookingModel.js:683:21
+    at Handshake.onConnect (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Pool.js:58:9)
+    at Handshake.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Handshake._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+2025-07-28 18:23:39 | ERROR | Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
+    at ServerResponse.setHeader (node:_http_outgoing:659:11)
+    at ServerResponse.header (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:684:10)
+    at ServerResponse.send (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:161:12)
+    at ServerResponse.json (C:\Users\Admin\Pictures\callback\node_modules\express\lib\response.js:250:15)
+    at C:\Users\Admin\Pictures\callback\controllers\bookingController.js:1150:36
+    at C:\Users\Admin\Pictures\callback\models\bookingModel.js:683:21
+    at Handshake.onConnect (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Pool.js:58:9)
+    at Handshake.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Handshake._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)

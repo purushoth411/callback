@@ -1,6 +1,6 @@
 // models/helperModel.js
 const db = require("../config/db"); // Update path if needed
-const moment = require('moment-timezone');
+const moment = require("moment-timezone");
 
 const getAllActiveTeams = (callback) => {
   const sql = `
@@ -130,7 +130,7 @@ const getAdmin = (type, status, callback) => {
   `;
   let params = [status];
 
-  if (type !== 'BOTH') {
+  if (type !== "BOTH") {
     query += ` AND fld_admin_type = ?`;
     params.push(type);
   } else {
@@ -153,7 +153,6 @@ const getAdmin = (type, status, callback) => {
     });
   });
 };
-
 
 const getPlanDetails = (callback) => {
   const query = `
@@ -198,10 +197,8 @@ const getBookingDetailsWithRc = (id, callback) => {
       values.push(id);
     }
 
- 
     sql += ` ORDER BY b.id DESC`;
     if (!id) {
-      
     }
 
     connection.query(sql, values, (error, results) => {
@@ -209,14 +206,13 @@ const getBookingDetailsWithRc = (id, callback) => {
       if (error) return callback(error);
 
       if (id) {
-        callback(null, results.length ? results[0] : null); 
+        callback(null, results.length ? results[0] : null);
       } else {
-        callback(null, results); 
+        callback(null, results);
       }
     });
   });
 };
-
 
 const getConsultantSettingData = (consultantId, callback) => {
   db.getConnection((err, connection) => {
@@ -279,8 +275,8 @@ const fetchTimezones = (viewtype = "", callback) => {
         formattedList[index] = tz;
       } else {
         const abbr = now.zoneAbbr(); // e.g., IST
-        const offset = now.format('Z'); // e.g., +05:30
-        const time = now.format('hh:mm A'); // e.g., 02:25 PM
+        const offset = now.format("Z"); // e.g., +05:30
+        const time = now.format("hh:mm A"); // e.g., 02:25 PM
         formattedList[index] = `${tz}  ${abbr} ${offset}  ${time}`;
       }
 
@@ -292,8 +288,6 @@ const fetchTimezones = (viewtype = "", callback) => {
     callback(error, null);
   }
 };
-
-
 
 const getBookingData = (params, callback) => {
   try {
@@ -315,7 +309,7 @@ const getBookingData = (params, callback) => {
         verifyOtpUrl = "",
         hideSubOption = "",
         clientId = "",
-        disabledBookingId = ""
+        disabledBookingId = "",
       } = params;
 
       let sql = `
@@ -339,13 +333,14 @@ const getBookingData = (params, callback) => {
         values.push(bookingId);
       }
 
-      if (consultantId && checkType !== 'CHECK_BOTH') {
+      if (consultantId && checkType !== "CHECK_BOTH") {
         sql += " AND b.fld_consultantid = ?";
         values.push(consultantId);
       }
 
-      if (checkType === 'CHECK_BOTH') {
-        sql += " AND (b.fld_consultantid = ? OR b.fld_secondary_consultant_id = ? OR b.fld_third_consultantid = ?)";
+      if (checkType === "CHECK_BOTH") {
+        sql +=
+          " AND (b.fld_consultantid = ? OR b.fld_secondary_consultant_id = ? OR b.fld_third_consultantid = ?)";
         values.push(consultantId, consultantId, consultantId);
       }
 
@@ -365,7 +360,8 @@ const getBookingData = (params, callback) => {
       }
 
       if (status == "Reject") {
-        sql += " AND b.fld_consultation_sts != 'Reject' AND b.fld_consultation_sts != 'Rescheduled'";
+        sql +=
+          " AND b.fld_consultation_sts != 'Reject' AND b.fld_consultation_sts != 'Rescheduled'";
       }
 
       if (showAcceptedCall === "Yes") {
@@ -397,7 +393,8 @@ const getBookingData = (params, callback) => {
       }
 
       if (hideSubOption) {
-        sql += " AND (b.fld_consultant_another_option = 'CONSULTANT' OR b.fld_consultant_another_option IS NULL)";
+        sql +=
+          " AND (b.fld_consultant_another_option = 'CONSULTANT' OR b.fld_consultant_another_option IS NULL)";
       }
 
       sql += ` ORDER BY b.id ${orderBy}`;
@@ -424,7 +421,7 @@ const getRcCallBookingRequest = (params, callback) => {
         consultantId = "",
         selectedDate = "",
         selectedSlot = "",
-        status = ""
+        status = "",
       } = params;
 
       let sql = `
@@ -499,32 +496,64 @@ const getAdminById = (adminId, callback) => {
 };
 
 const getMessagesByBookingId = (bookingId, callback) => {
-    db.getConnection((err, connection) => {
-      if (err) {
-        console.error("Connection error:", err);
-        return callback(err, null);
-      }
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("Connection error:", err);
+      return callback(err, null);
+    }
 
-      const query = `
+    const query = `
         SELECT tbl_booking_chat.* , tbl_admin.fld_name as sender_name 
         FROM tbl_booking_chat
         LEFT JOIN tbl_admin ON tbl_booking_chat.fld_sender_id = tbl_admin.id
         WHERE tbl_booking_chat.fld_bookingid = ?
-        ORDER BY tbl_booking_chat.fld_addedon DESC
+        ORDER BY tbl_booking_chat.fld_addedon ASC
       `;
 
-      connection.query(query, [bookingId], (queryErr, results) => {
-        connection.release(); // Always release the connection
+    connection.query(query, [bookingId], (queryErr, results) => {
+      connection.release(); 
 
-        if (queryErr) {
-          console.error("Query error:", queryErr);
-          return callback(queryErr, null);
-        }
+      if (queryErr) {
+        console.error("Query error:", queryErr);
+        return callback(queryErr, null);
+      }
 
-        return callback(null, results);
+      return callback(null, results);
+    });
+  });
+};
+
+const getMessageCount = (bookingid, callback) => {
+  try {
+    db.getConnection((err, connection) => {
+      if (err) return callback(err);
+
+      const query = `SELECT COUNT(*) AS count FROM tbl_booking_chat WHERE fld_bookingid = ?`;
+      connection.query(query, [bookingid], (err, results) => {
+        connection.release();
+        callback(err, results);
       });
     });
+  } catch (error) {
+    callback(error);
   }
+};
+
+const insertChatMessage = (data, callback) => {
+  try {
+    db.getConnection((err, connection) => {
+      if (err) return callback(err);
+
+      const query = `INSERT INTO tbl_booking_chat SET ?`;
+      connection.query(query, data, (err, results) => {
+        connection.release();
+        callback(err, results);
+      });
+    });
+  } catch (error) {
+    callback(error);
+  }
+};
 
 module.exports = {
   getAllTeams,
@@ -546,4 +575,6 @@ module.exports = {
   getAdmin,
   getAdminById,
   getMessagesByBookingId,
+  getMessageCount,
+  insertChatMessage,
 };

@@ -18,6 +18,9 @@ router.post('/saveCallScheduling', bookingController.saveCallScheduling);
 router.post("/fetchBookingById", bookingController.fetchBookingById);
 router.post("/deleteBookingById", bookingController.deleteBookingById);
 router.post("/setAsConverted", bookingController.setAsConverted);
+router.post("/updateStatusByCrm", bookingController.updateStatusByCrm);
+router.get("/getBookingData", bookingController.getBookingData);
+router.post("/markAsConfirmByClient", bookingController.markAsConfirmByClient);
 
 
 

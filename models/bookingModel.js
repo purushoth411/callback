@@ -1007,6 +1007,104 @@ const deleteBookingById = (bookingId, callback) => {
   });
 };
 
+const getAllCrmIds = (callback) => {
+  const query = `
+    SELECT GROUP_CONCAT(id) AS crmids 
+    FROM tbl_admin 
+    WHERE fld_admin_type = 'EXECUTIVE' AND status = 'Active'
+  `;
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(query, (error, results) => {
+      connection.release();
+
+      if (error) return callback(error);
+
+      const crmIds = results[0]?.crmids || '';
+      callback(null, crmIds);
+    });
+  });
+};
+
+const getBookingData = (params, callback) => {
+  const {
+    bookingId = '',
+    consultantId = '',
+    bookingDate = '',
+    bookingSlot = ''
+  } = params;
+
+  let conditions = [`tbl_booking.callDisabled IS NULL`];
+  let values = [];
+
+  if (bookingId) {
+    conditions.push(`tbl_booking.id = ?`);
+    values.push(bookingId);
+  }
+  if (consultantId) {
+    conditions.push(`tbl_booking.fld_consultantid = ?`);
+    values.push(consultantId);
+  }
+  if (bookingDate) {
+    conditions.push(`tbl_booking.fld_booking_date = ?`);
+    values.push(bookingDate);
+  }
+  if (bookingSlot) {
+    conditions.push(`tbl_booking.fld_booking_slot = ?`);
+    values.push(bookingSlot);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const query = `
+    SELECT 
+      tbl_booking.*, 
+      tbl_admin.fld_client_code AS admin_code,
+      tbl_admin.fld_name AS admin_name,
+      tbl_admin.fld_email AS admin_email,
+      tbl_admin.fld_profile_image AS profile_image,
+      tbl_admin.fld_client_code AS consultant_code,
+      tbl_user.fld_user_code AS user_code,
+      tbl_user.fld_name AS user_name,
+      tbl_user.fld_email AS user_email,
+      tbl_user.fld_decrypt_password AS user_pass,
+      tbl_user.fld_country_code AS user_country_code,
+      tbl_user.fld_phone AS user_phone,
+      tbl_user.fld_address,
+      tbl_user.fld_city,
+      tbl_user.fld_pincode,
+      tbl_user.fld_country
+    FROM tbl_booking
+    LEFT JOIN tbl_admin ON tbl_booking.fld_consultantid = tbl_admin.id
+    LEFT JOIN tbl_user ON tbl_booking.fld_userid = tbl_user.id
+    ${whereClause}
+    ORDER BY tbl_booking.id DESC
+  `;
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    try {
+      connection.query(query, values, (error, results) => {
+        connection.release();
+        if (error) return callback(error);
+
+        if (bookingId) {
+          callback(null, results[0] || null);
+        } else {
+          callback(null, results || []);
+        }
+      });
+    } catch (error) {
+      connection.release();
+      callback(error);
+    }
+  });
+};
+
+
 
 
 module.exports = {
@@ -1035,4 +1133,6 @@ module.exports = {
   getPostsaleCompletedCalls,
   getBookingById,
   deleteBookingById,
+  getAllCrmIds,
+  getBookingData,
 };
