@@ -91,8 +91,26 @@ const getParticularStatusCallsOfCrm = (req, res) => {
 };
 
 
+const getConsultantSettingData = (req, res) => {
+  const { consultantid } = req.body;
+
+  dashboardModel.getConsultantSettingData(consultantid, (err, result) => {
+    if (err) {
+      console.error("Error fetching consultant setting:", err);
+      return res.status(500).json({ status: false, message: "Server error" });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: "Success",
+      data: result || null,
+    });
+  });
+};
+
 module.exports = {
     getAllActiveTeams,
     getCallStatistics,
-    getParticularStatusCallsOfCrm
+    getParticularStatusCallsOfCrm,
+    getConsultantSettingData
 }

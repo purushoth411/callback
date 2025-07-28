@@ -1,8 +1,15 @@
 const db = require("../config/db");
 const instacrm_db = require("../config/instacrm_db");
 const rc_db = require("../config/rc_db");
+const moment = require('moment');
 
-const getBookings = (userId, userType, assigned_team, filters, callback) => {
+
+const getBookings = (userId, userType, assigned_team, filters, dashboard_status, callback) => {
+
+  const currentDate = moment();
+  const twoDaysBefore = currentDate.clone().subtract(2, 'days').format('YYYY-MM-DD');
+  const twoDaysAfter = currentDate.clone().add(2, 'days').format('YYYY-MM-DD');
+
   let sql = `
     SELECT 
       b.*,
@@ -25,70 +32,84 @@ const getBookings = (userId, userType, assigned_team, filters, callback) => {
 
   const params = [];
 
- const buildFilters = () => {
-  // Booking status
-  if (Array.isArray(filters.consultationStatus) && filters.consultationStatus.length > 0) {
-    const placeholders = filters.consultationStatus.map(() => "?").join(",");
-    sql += ` AND b.fld_consultation_sts IN (${placeholders})`;
-    params.push(...filters.consultationStatus);
-  } else if (filters.consultationStatus) {
-    sql += ` AND b.fld_consultation_sts = ?`;
-    params.push(filters.consultationStatus);
-  }
+  const buildFilters = () => {
+    // Booking status
+    if (Array.isArray(filters.consultationStatus) && filters.consultationStatus.length > 0) {
+      const placeholders = filters.consultationStatus.map(() => "?").join(",");
+      sql += ` AND b.fld_consultation_sts IN (${placeholders})`;
+      params.push(...filters.consultationStatus);
+    } else if (filters.consultationStatus) {
+      sql += ` AND b.fld_consultation_sts = ?`;
+      params.push(filters.consultationStatus);
+    }
 
-  // Call recording status
-  if (filters.recordingStatus) {
-    sql += ` AND b.callRecordingSts = ?`;
-    params.push(filters.recordingStatus);
-  }
 
-  // Sale Type (Presales, Postsales)
-  if (filters.sale_type) {
-    sql += ` AND b.fld_sale_type = ?`;
-    params.push(filters.sale_type);
-  }
 
-  // Consultant
-  if (filters.consultantId) {
-    sql += ` AND b.fld_consultantid = ?`;
-    params.push(filters.consultantId);
-  }
+    // Call recording status
+    if (filters.recordingStatus) {
+      sql += ` AND b.callRecordingSts = ?`;
+      params.push(filters.recordingStatus);
+    }
 
-  // CRM
-  if (filters.crmId) {
-    sql += ` AND b.fld_addedby = ?`;
-    params.push(filters.crmId);
-  }
+    // Sale Type (Presales, Postsales)
+    if (filters.sale_type) {
+      sql += ` AND b.fld_sale_type = ?`;
+      params.push(filters.sale_type);
+    }
 
-  // Keyword Search
-  if (filters.search) {
-    sql += ` AND (b.fld_name LIKE ? OR b.fld_email LIKE ?)`;
-    params.push(`%${filters.search}%`, `%${filters.search}%`);
-  }
+    // Consultant
+    if (filters.consultantId) {
+      sql += ` AND b.fld_consultantid = ?`;
+      params.push(filters.consultantId);
+    }
 
-  // Date Range — uses filter_type to determine date field
-  if (filters.fromDate && filters.toDate) {
-    const dateField =
-      filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
+    // CRM
+    if (filters.crmId) {
+      sql += ` AND b.fld_addedby = ?`;
+      params.push(filters.crmId);
+    }
 
-    sql += ` AND DATE(${dateField}) BETWEEN ? AND ?`;
-    params.push(filters.fromDate, filters.toDate);
-  } else if (filters.fromDate) {
-    const dateField =
-      filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
+    // Keyword Search
+    if (filters.search) {
+      sql += ` AND (b.fld_name LIKE ? OR b.fld_email LIKE ?)`;
+      params.push(`%${filters.search}%`, `%${filters.search}%`);
+    }
 
-    sql += ` AND DATE(${dateField}) >= ?`;
-    params.push(filters.fromDate);
-  } else if (filters.toDate) {
-    const dateField =
-      filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
+    // Date Range — uses filter_type to determine date field
+    if (filters.fromDate && filters.toDate) {
+      const dateField =
+        filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
 
-    sql += ` AND DATE(${dateField}) <= ?`;
-    params.push(filters.toDate);
-  }
+      sql += ` AND DATE(${dateField}) BETWEEN ? AND ?`;
+      params.push(filters.fromDate, filters.toDate);
+    } else if (filters.fromDate) {
+      const dateField =
+        filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
 
-  // Ordering
-  sql += `
+      sql += ` AND DATE(${dateField}) >= ?`;
+      params.push(filters.fromDate);
+    } else if (filters.toDate) {
+      const dateField =
+        filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
+
+      sql += ` AND DATE(${dateField}) <= ?`;
+      params.push(filters.toDate);
+    }
+
+    if (dashboard_status) {
+      sql += ` AND b.fld_call_request_sts = ?`;
+      params.push(dashboard_status);
+      sql += ` AND b.fld_consultation_sts = ?`;
+      params.push(dashboard_status);
+
+      sql += ` AND b.fld_booking_date BETWEEN ? AND ?`;
+      params.push(twoDaysBefore, twoDaysAfter);
+    }
+
+
+
+    // Ordering
+    sql += `
     ORDER BY 
       CASE 
         WHEN DATE(b.fld_booking_date) = CURDATE() THEN 1 
@@ -101,7 +122,7 @@ const getBookings = (userId, userType, assigned_team, filters, callback) => {
       b.fld_booking_slot ASC
     LIMIT 500
   `;
-};
+  };
 
   const executeQuery = () => {
     buildFilters();
@@ -288,7 +309,7 @@ const getPostsaleClientDetails = (client_id, callback) => {
 
         const plan_type = (planResult && planResult.length > 0) ? planResult[0].plan_type : null;
 
-        
+
         const response = {
           name: student.name,
           email: student.email,
@@ -651,7 +672,7 @@ const insertBooking = (
   });
 };
 
- const updateBooking = (bookingId, updateData, callback) => {
+const updateBooking = (bookingId, updateData, callback) => {
   const fields = Object.keys(updateData);
   const values = Object.values(updateData);
   const setClause = fields.map(field => `${field} = ?`).join(', ');
@@ -877,7 +898,7 @@ const insertUser = (data, email, name, verifyCode, callback) => {
 
 
 
-const updateRcCallRequestSts = async (callRequestId, rcCallRequestId, status, callback = () => {}) => {
+const updateRcCallRequestSts = async (callRequestId, rcCallRequestId, status, callback = () => { }) => {
   if (!callRequestId || !rcCallRequestId || !status) {
     return callback(null, false);
   }
@@ -929,7 +950,7 @@ const getPostsaleCompletedCalls = (email, milestone_id, callback) => {
         return callback(error, null);
       }
 
-      return callback(null,results[0]); 
+      return callback(null, results[0]);
     });
   });
 };
