@@ -1,5 +1,6 @@
 const bookingModel = require("../models/bookingModel");
 const helperModel = require("../models/helperModel");
+const mailSending = require("../sendPostmarkMail");
 const crypto = require("crypto");
 const logger = require("../logger");
 const moment = require("moment-timezone");
@@ -18,7 +19,6 @@ const fetchBookings = (req, res) => {
       message: "Missing userId or userType",
     });
   }
-
 
   bookingModel.getBookings(
     userId,
@@ -654,14 +654,21 @@ function generateUserCode() {
 
 function getFormattedDate() {
   const d = new Date();
-  return d.toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function getFormattedTime() {
   const d = new Date();
-  return d.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', hour12: true });
+  return d.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
-
 
 const checkPostsaleCompletedCalls = (req, res) => {
   try {
@@ -694,9 +701,6 @@ const checkPostsaleCompletedCalls = (req, res) => {
   }
 };
 
-
-
-
 const saveCallScheduling = (req, res) => {
   const {
     bookingId,
@@ -728,13 +732,17 @@ const saveCallScheduling = (req, res) => {
 
   // Step 1: Update Booking
   bookingModel.updateBooking(bookingId, bookingData, (err) => {
-    if (err) return res.json({ status: false, message: "Failed to update booking." });
+    if (err)
+      return res.json({ status: false, message: "Failed to update booking." });
 
     // Step 2: Get Consultant Info
     helperModel.getAdminById(consultantId, (err, admin) => {
-      if (err || !admin) return res.json({ status: false, message: "Consultant not found." });
+      if (err || !admin)
+        return res.json({ status: false, message: "Consultant not found." });
 
-      const comment = `Call scheduled by ${admin.fld_name} on ${moment().format("DD MMM YYYY")} at ${moment().format("hh:mm a")}`;
+      const comment = `Call scheduled by ${admin.fld_name} on ${moment().format(
+        "DD MMM YYYY"
+      )} at ${moment().format("hh:mm a")}`;
 
       const historyData = {
         fld_booking_id: bookingId,
@@ -746,7 +754,11 @@ const saveCallScheduling = (req, res) => {
 
       // Step 3: Insert Primary Consultant History
       bookingModel.insertBookingHistory(historyData, (err) => {
-        if (err) return res.json({ status: false, message: "Failed to insert history log." });
+        if (err)
+          return res.json({
+            status: false,
+            message: "Failed to insert history log.",
+          });
 
         // Step 4: Secondary Consultant (if passed)
         if (secondaryConsultantId) {
@@ -754,11 +766,16 @@ const saveCallScheduling = (req, res) => {
             if (err || !secAdmin) {
               return res.json({
                 status: true,
-                message: "Call scheduled, but failed to load secondary consultant.",
+                message:
+                  "Call scheduled, but failed to load secondary consultant.",
               });
             }
 
-            const secComment = `Call scheduled by ${admin.fld_name} for secondary consultant on ${moment().format("DD MMM YYYY")} at ${moment().format("hh:mm a")}`;
+            const secComment = `Call scheduled by ${
+              admin.fld_name
+            } for secondary consultant on ${moment().format(
+              "DD MMM YYYY"
+            )} at ${moment().format("hh:mm a")}`;
 
             const secHistory = {
               fld_booking_id: bookingId,
@@ -772,38 +789,50 @@ const saveCallScheduling = (req, res) => {
               if (err) {
                 return res.json({
                   status: true,
-                  message: "Call scheduled, but failed to log secondary consultant history.",
+                  message:
+                    "Call scheduled, but failed to log secondary consultant history.",
                 });
               }
 
-              return res.json({ status: true, message: "Call scheduled successfully." });
+              return res.json({
+                status: true,
+                message: "Call scheduled successfully.",
+              });
             });
           });
         } else {
-          return res.json({ status: true, message: "Call scheduled successfully." });
+          return res.json({
+            status: true,
+            message: "Call scheduled successfully.",
+          });
         }
       });
     });
   });
 };
 
-
 const fetchBookingById = (req, res) => {
   try {
     const { bookingId } = req.body;
 
     if (!bookingId) {
-      return res.status(400).json({ status: false, message: "Booking ID required" });
+      return res
+        .status(400)
+        .json({ status: false, message: "Booking ID required" });
     }
 
     bookingModel.getBookingById(bookingId, (err, result) => {
       if (err) {
         console.error("DB Error:", err);
-        return res.status(500).json({ status: false, message: "Database error" });
+        return res
+          .status(500)
+          .json({ status: false, message: "Database error" });
       }
 
       if (result.length === 0) {
-        return res.status(404).json({ status: false, message: "Booking not found" });
+        return res
+          .status(404)
+          .json({ status: false, message: "Booking not found" });
       }
 
       res.status(200).json({ status: true, data: result[0] });
@@ -828,20 +857,21 @@ const deleteBookingById = (req, res) => {
     }
 
     if (result.affectedRows > 0) {
-      return res.json({ status: true, message: "Booking deleted successfully" });
+      return res.json({
+        status: true,
+        message: "Booking deleted successfully",
+      });
     } else {
-      return res.json({ status: false, message: "Booking not found or already deleted" });
+      return res.json({
+        status: false,
+        message: "Booking not found or already deleted",
+      });
     }
   });
 };
 
 const setAsConverted = (req, res) => {
-  const {
-    bookingId,
-    rcCode,
-    projectId,
-    user
-  } = req.body;
+  const { bookingId, rcCode, projectId, user } = req.body;
 
   if (!bookingId || !rcCode || !projectId) {
     return res.json({ status: false, message: "Missing required data." });
@@ -853,11 +883,13 @@ const setAsConverted = (req, res) => {
 
   // Step 1: Update Booking
   bookingModel.updateBooking(bookingId, bookingData, (err) => {
-    if (err) return res.json({ status: false, message: "Failed to update booking." });
+    if (err)
+      return res.json({ status: false, message: "Failed to update booking." });
 
     // Step 2: Get Admin Info
     helperModel.getAdminById(user.id, (err, admin) => {
-      if (err || !admin) return res.json({ status: false, message: "Admin not found." });
+      if (err || !admin)
+        return res.json({ status: false, message: "Admin not found." });
 
       const currentDate = moment().format("DD MMM YYYY");
       const currentTime = moment().format("hh:mm a");
@@ -868,30 +900,466 @@ const setAsConverted = (req, res) => {
       const historyData = {
         fld_booking_id: bookingId,
         fld_comment: comment,
-        fld_addedon: moment().format("YYYY-MM-DD")
+        fld_addedon: moment().format("YYYY-MM-DD"),
       };
 
       bookingModel.insertBookingHistory(historyData, (err) => {
-        if (err) return res.json({ status: false, message: "Failed to insert history log." });
+        if (err)
+          return res.json({
+            status: false,
+            message: "Failed to insert history log.",
+          });
 
         // Step 4: Insert Booking Status History
         const statusHistoryData = {
           fld_booking_id: bookingId,
           status: "Converted",
-          fld_comment: comment
+          fld_comment: comment,
         };
 
         bookingModel.insertBookingStatusHistory(statusHistoryData, (err) => {
-          if (err) return res.json({ status: false, message: "Failed to insert status history." });
+          if (err)
+            return res.json({
+              status: false,
+              message: "Failed to insert status history.",
+            });
 
-          return res.json({ status: true, message: "Marked as converted successfully." });
+          return res.json({
+            status: true,
+            message: "Marked as converted successfully.",
+          });
         });
       });
     });
   });
 };
 
+const updateStatusByCrm = (req, res) => {
+  const { bookingid, statusByCrm } = req.body;
 
+  if (!bookingid || !statusByCrm) {
+    return res
+      .status(400)
+      .json({ status: false, message: "Invalid request data" });
+  }
+
+  bookingModel.getBookingRowById(bookingid, (err, bookingInfo) => {
+    if (err)
+      return res.status(500).json({ status: false, message: "Database error" });
+    if (!bookingInfo)
+      return res
+        .status(404)
+        .json({ status: false, message: "Booking not found" });
+
+    let dataToUpdate = { statusByCrm };
+
+    if (statusByCrm === "Postponed") {
+      dataToUpdate = {
+        fld_call_request_sts: "Postponed",
+        fld_call_confirmation_status: "",
+        fld_booking_date: null,
+        fld_booking_slot: null,
+        fld_consultation_sts: "Pending",
+      };
+    }
+
+    bookingModel.updateBooking(bookingid, dataToUpdate, (err, updated) => {
+      if (err)
+        return res
+          .status(500)
+          .json({ status: false, message: "Error updating booking" });
+
+      let strmsg = "";
+      if (statusByCrm === "Completed") strmsg = "Marked As Completed";
+      else if (statusByCrm === "Not Join")
+        strmsg = "Marked As Client Did Not Join";
+      else if (statusByCrm === "Postponed") strmsg = "Postponed";
+
+      const currentDate = moment().format("D MMM YYYY");
+      const currentTime = moment().format("hh:mm a");
+      const adminName = req.session?.admin_name || "Admin";
+      const comment = `Call ${strmsg} by ${adminName} on ${currentDate} at ${currentTime}`;
+
+      bookingModel.getAllCrmIds((err, crmids) => {
+        if (err)
+          return res
+            .status(500)
+            .json({ status: false, message: "Error getting CRM users" });
+
+        const historyData = {
+          fld_booking_id: bookingid,
+          fld_comment: comment,
+          fld_notif_for: "EXECUTIVE",
+          crmIdsNotifi: crmids,
+          fld_addedon: moment().format("YYYY-MM-DD"),
+        };
+
+        bookingModel.insertBookingHistory(historyData, (err, historyId) => {
+          if (err)
+            return res.status(500).json({
+              status: false,
+              message: "Error inserting booking history",
+            });
+
+          return res.json({
+            status: true,
+            message: "Status updated successfully",
+          });
+        });
+      });
+    });
+  });
+};
+
+const getBookingData = (req, res) => {
+  const { bookingId, consultantId, bookingDate, bookingSlot } = req.query;
+
+  try {
+    bookingModel.getBookingData(
+      { consultantId, bookingDate, bookingSlot },
+      (err, data) => {
+        if (err) {
+          console.error("Error in getBookingData:", err);
+          return res
+            .status(500)
+            .json({ status: false, message: "Server error" });
+        }
+
+        res.json({ status: true, data });
+      }
+    );
+  } catch (error) {
+    console.error("Exception in getBookingData:", error);
+    res.status(500).json({ status: false, message: "Unexpected error" });
+  }
+};
+
+
+const markAsConfirmByClient = (req, res) => {
+  const { bookingId } = req.body;
+  if (!bookingId) {
+    return res.status(400).json({ status: false, message: "Missing bookingId" });
+  }
+
+  try {
+    bookingModel.getBookingRowById(bookingId, (err, booking) => {
+      if (err || !booking) {
+        return res.status(500).json({
+          status: false,
+          message: "Booking not found or error occurred",
+        });
+      }
+
+      const updateData = {
+        fld_call_confirmation_status: "Call Confirmed by Client",
+        fld_otp: "",
+        fld_verify_otp_url: null,
+        fld_consultation_sts: "Accept",
+        fld_call_request_sts: "Accept",
+        fld_status_options:
+          "I have gone through all the details,I have received the meeting link",
+      };
+
+      bookingModel.updateBooking(bookingId, updateData, (updateErr) => {
+        if (updateErr) {
+          return res.status(500).json({
+            status: false,
+            message: "Failed to update booking",
+          });
+        }
+
+        const comment = `Call Mark as Confirmed by Client done by subadmin on ${moment().format("DD-MM-YYYY")} at ${moment().format("hh:mm A")}`;
+        const historyData = {
+          fld_booking_id: bookingId,
+          fld_comment: comment,
+          fld_notif_for: "EXECUTIVE",
+          fld_notif_for_id: booking.fld_addedby,
+          fld_addedon: new Date(),
+        };
+
+        bookingModel.insertBookingHistory(historyData, (historyErr) => {
+          if (historyErr) {
+            return res.status(500).json({
+              status: false,
+              message: "Failed to insert history",
+            });
+          }
+
+          // Conditionally update RC Call Request only if both IDs are present
+          if (
+            booking.fld_call_request_id &&
+            booking.fld_rc_call_request_id
+          ) {
+            bookingModel.updateRcCallRequestSts(
+              booking.fld_call_request_id,
+              booking.fld_rc_call_request_id,
+              "Accept",
+              (rcErr) => {
+                if (rcErr) {
+                  return res.status(500).json({
+                    status: false,
+                    message: "Failed to update RC call request",
+                  });
+                }
+                proceedWithOtherBookings();
+              }
+            );
+          } else {
+            proceedWithOtherBookings();
+          }
+
+          // Handle rescheduling of other bookings
+          function proceedWithOtherBookings() {
+  bookingModel.getBookingData(
+    {
+      consultantId: booking.fld_consultantid,
+      bookingDate: booking.fld_booking_date,
+      bookingSlot: booking.fld_booking_slot,
+    },
+    (err, otherBookings) => {
+      if (err) {
+        return res.status(500).json({
+          status: false,
+          message: "Failed to fetch other bookings",
+        });
+      }
+
+      const tasks = otherBookings.filter(
+        (row) =>
+          row.id !== bookingId &&
+          row.fld_call_confirmation_status !== "Call Confirmed by Client"
+      );
+
+      if (tasks.length === 0) return finalizeMail();
+
+      let remaining = tasks.length;
+
+      tasks.forEach((row) => {
+        const cancelData = {
+          fld_call_confirmation_status: "",
+          fld_booking_date: null,
+          fld_booking_slot: null,
+          fld_call_request_sts: "Rescheduled",
+          fld_consultation_sts: "Rescheduled",
+          fld_verify_otp_url: null,
+          fld_otp: "",
+        };
+
+        bookingModel.updateBooking(row.id, cancelData, (updateErr2) => {
+          if (updateErr2) {
+            return res.status(500).json({
+              status: false,
+              message: "Failed to update other booking" + updateErr2,
+            });
+          }
+
+          // Only update tbl_rc_call_request when both fields are not null
+          if (row.fld_call_request_id && row.fld_rc_call_request_id) {
+            bookingModel.updateRcCallRequest(
+              row.fld_rc_call_request_id,
+              {
+                fld_status: "Rescheduled",
+              },
+              (rcErr) => {
+                if (rcErr) {
+                  return res.status(500).json({
+                    status: false,
+                    message: "Failed to update RC call request",
+                  });
+                }
+                insertHistoryAndCheckRemaining(row);
+              }
+            );
+          } else {
+            insertHistoryAndCheckRemaining(row);
+          }
+        });
+      });
+
+      // Separate function to handle inserting history and checking remaining
+      function insertHistoryAndCheckRemaining(row) {
+        const cancelComment = `Call cancelled and to be rescheduled as client did not confirm on ${moment().format("DD-MM-YYYY")} at ${moment().format("hh:mm A")}`;
+        const cancelHistory = {
+          fld_booking_id: row.id,
+          fld_comment: cancelComment,
+          fld_notif_for: "EXECUTIVE",
+          fld_notif_for_id: row.fld_addedby,
+          fld_addedon: new Date(),
+        };
+
+        bookingModel.insertBookingHistory(cancelHistory, (err) => {
+          if (err) {
+            return res.status(500).json({
+              status: false,
+              message: "Failed to insert cancel history",
+            });
+          }
+
+          remaining--;
+          if (remaining === 0) finalizeMail();
+        });
+      }
+    }
+  );
+}
+
+
+          // Send confirmation email to CRM
+          function finalizeMail() {
+            helperModel.getAdminById(booking.fld_addedby, (err, crm) => {
+              if (err || !crm) {
+                return res.status(200).json({
+                  status: true,
+                  message: "Call confirmed, CRM not found for email",
+                });
+              }
+
+              const subject = `Call confirmed by client ${booking.fld_name} - Booking Id ${booking.fld_bookingcode} || ${process.env.WEBNAME}`;
+              const body = `Hi ${crm.fld_name}, <br/><br/>The client ${booking.fld_name} with booking id ${booking.fld_bookingcode} has confirmed the call and will be available.<br/><br/>Thanks & regards,<br/>${process.env.WEBNAME}<br/>`;
+
+              const from = process.env.MAIL_FROM || "donotreply@rapidcollaborate.com";
+              const to = "rkip4112001@gmail.com";
+              const bcc = "";
+
+              mailSending.sendMail(from, to, subject, body, bcc, (err, result) => {
+                if (err) {
+                  return res.status(500).json({
+                    status: false,
+                    message: "Email sending failed",
+                  });
+                }
+
+                return res.status(200).json({
+                  status: true,
+                  message: "Call confirmed successfully",
+                });
+              });
+            });
+          }
+        });
+      });
+    });
+  } catch (error) {
+    console.error("Error in controller :", error);
+    return res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+const reassignComment = (req, res) => {
+  
+    const bookingId = req.body.bookingid;
+    const reassignComment = req.body.reassign_comment;
+    const user=req.body.user;
+    try{
+
+    if (bookingId > 0 && reassignComment !== "") {
+      const updateData = {
+        fld_reassign_comment: reassignComment,
+        fld_call_request_sts: "Reassign Request",
+      };
+
+      bookingModel.updateBooking(bookingId, updateData, (err) => {
+        if (err) {
+          return res.status(500).json({
+            status: false,
+            message: "Failed to submit call reassign comment!",
+          });
+        }
+
+        const get_current_date = moment().format("DD MMM YYYY");
+        const get_current_time = moment().format("hh:mm a");
+
+        const comment = `Call reassign request to another consultant by ${user.fld_name} on ${get_current_date} at ${get_current_time}`;
+
+        const historyData = {
+          fld_booking_id: bookingId,
+          fld_comment: comment,
+          fld_notif_for: "SUPERADMIN",
+          fld_notif_for_id: 1,
+          fld_addedon: new Date(),
+        };
+
+        bookingModel.insertBookingHistory(historyData, (historyErr) => {
+          if (historyErr) {
+            return res.status(500).json({
+              status: false,
+              message: "Failed to insert reassign comment history!",
+            });
+          }
+
+          bookingModel.getBookingRowById(bookingId, (err, booking) => {
+            if (
+              booking &&
+              booking.fld_consultantid &&
+              booking.fld_call_request_id &&
+              booking.fld_rc_call_request_id
+            ) {
+              bookingModel.updateRcCallRequestSts(
+                booking.fld_call_request_id,
+                booking.fld_rc_call_request_id,
+                "Reassign Request",
+                (rcErr) => {
+                  if (rcErr) {
+                    return res.status(500).json({
+                      status: false,
+                      message: "Failed to update RC Call Request status",
+                    });
+                  }
+
+                  return res.status(200).json({
+                    status: true,
+                    message: "Call reassign comment submitted successfully",
+                  });
+                }
+              );
+            } else {
+              return res.status(200).json({
+                status: true,
+                message: "Call reassign comment submitted successfully",
+              });
+            }
+          });
+        });
+      });
+    } else {
+      return res.status(400).json({
+        status: false,
+        message: "Missing bookingId or reassign comment",
+      });
+    }
+  }catch (error) {
+    console.error("Exception in Reassign Comment:", error);
+    res.status(500).json({ status: false, message: "Unexpected error" });
+  }
+ 
+};
+
+const getExternalCallByBookingId = (req, res) => {
+  const bookingId = parseInt(req.query.bookingId);
+  const id = req.query.id ? parseInt(req.query.id) : 0;
+
+  if (!bookingId) {
+    return res.status(400).json({
+      status: false,
+      message: "Booking ID is required",
+    });
+  }
+
+  bookingModel.getExternalCallInfo(id, bookingId, (err, data) => {
+    if (err) {
+      console.error("DB Error:", err);
+      return res.status(500).json({
+        status: false,
+        message: "Database error",
+      });
+    }
+
+    return res.json({
+      status: true,
+      data: data,
+    });
+  });
+};
 
 module.exports = {
   fetchBookings,
@@ -909,4 +1377,9 @@ module.exports = {
   fetchBookingById,
   deleteBookingById,
   setAsConverted,
+  updateStatusByCrm,
+  getBookingData,
+  markAsConfirmByClient,
+  reassignComment,
+  getExternalCallByBookingId,
 };

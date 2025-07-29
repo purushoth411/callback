@@ -1,5 +1,6 @@
 // controllers/helperController.js
 const helperModel = require("../models/helperModel");
+const bookingModel = require("../models/bookingModel");
 const db = require("../config/db");
 
 const getAllActiveTeams = (req, res) => {
@@ -369,6 +370,82 @@ const getRcCallBookingRequest = (req, res) => {
   }
 };
 
+const getMessageData = (req, res) => {
+  try {
+    const { bookingId } = req.query;
+
+    if (!bookingId) {
+      return res.status(400).json({ status: false, message: "Missing bookingId" });
+    }
+
+    helperModel.getMessagesByBookingId(bookingId, (err, messages) => {
+      if (err) {
+        console.error("Error fetching messages:", err);
+        return res.status(500).json({ status: false, message: "Database error" });
+      }
+
+      return res.status(200).json({ status: true, messages });
+    });
+
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return res.status(500).json({ status: false, message: "Unexpected server error" });
+  }
+};
+
+const chatSubmit = (req, res) => {
+  const { comment, bookingid, sender_id, admin_type } = req.body;
+
+  if (!comment || !bookingid || !sender_id || !admin_type) {
+    return res.status(400).json({ success: false, message: "Missing required fields" });
+  }
+
+  helperModel.getMessageCount(bookingid, (countErr, countResult) => {
+    if (countErr) return res.status(500).json({ success: false, message: "DB error" });
+
+    if (countResult[0].count >= 5) {
+      return res.status(200).json({ success: false, message: "limit_exceed" });
+    }
+
+    bookingModel.getBookingById(bookingid, (bookErr, bookRows) => {
+      if (bookErr || bookRows.length === 0) {
+        return res.status(404).json({ success: false, message: "Booking not found" });
+      }
+
+      const booking = bookRows[0];
+      let receiver_id;
+      if (admin_type === "CONSULTANT" || admin_type === "SUBADMIN") {
+        receiver_id = booking.fld_addedby;
+      } else if (admin_type === "EXECUTIVE") {
+        receiver_id = booking.fld_consultantid;
+      } else {
+        return res.status(400).json({ success: false, message: "Invalid admin type" });
+      }
+
+      const insertData = {
+        fld_bookingid: bookingid,
+        fld_message: comment,
+        fld_postedby: admin_type,
+        fld_view_status: "NO",
+        fld_sender_id: sender_id,
+        fld_receiver_id: receiver_id,
+        fld_addedon: new Date()
+      };
+
+      helperModel.insertChatMessage(insertData, (insertErr, result) => {
+        if (insertErr) {
+          return res.status(500).json({ success: false, message: "Insert failed" });
+        }
+
+     return res.status(200).json({
+            success: true,
+            message: "Message sent",
+            chatId: result.insertId
+          });
+      });
+    });
+  });
+};
 
 
 module.exports = {
@@ -390,4 +467,6 @@ module.exports = {
 
 
   getAdmin,
+  getMessageData,
+  chatSubmit,
 };

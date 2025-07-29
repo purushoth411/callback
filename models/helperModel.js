@@ -1,102 +1,89 @@
 // models/helperModel.js
 const db = require("../config/db"); // Update path if needed
-const moment = require('moment-timezone');
+const moment = require("moment-timezone");
 
+// Get all active teams
 const getAllActiveTeams = (callback) => {
-  const sql = `
-    SELECT * FROM tbl_team
-    WHERE status = 'Active'
-    ORDER BY fld_addedon DESC
-  `;
   db.getConnection((err, connection) => {
-    if (err) {
-      console.error("DB connection error:", err);
-      return callback(err, null);
-    }
-    connection.query(sql, (err, results) => {
-      connection.release()
-      if (err) return callback(err, null);
-      return callback(null, results);
-    });
-  })
-};
+    if (err) return callback(err, null);
 
-const getAllTeams = (callback) => {
-  const sql = `
-        SELECT 
-          *
-        FROM 
-            tbl_team 
-       
-        ORDER BY 
-            tbl_team.fld_addedon DESC
+    const sql = `
+      SELECT * FROM tbl_team
+      WHERE status = 'Active'
+      ORDER BY fld_addedon DESC
     `;
-  db.getConnection((err, connection) => {
-    if (err) {
-      console.error("DB connection error:", err);
-      return callback(err, null);
-    }
-    connection.query(sql, (err, results) => {
-      connection.release();
-      if (err) return callback(err, null);
+
+    connection.query(sql, (queryErr, results) => {
+      connection.release(); // Always release the connection
+      if (queryErr) return callback(queryErr, null);
       return callback(null, results);
-    });
-  })
-};
-
-const addTeam = (teamData, callback) => {
-  const sql = `INSERT INTO tbl_team (fld_title, fld_addedon, status) VALUES (?, NOW(), 'Active')`;
-
-  db.getConnection((err, connection) => {
-    if (err) {
-      console.error("DB connection error:", err);
-      return callback(err, null);
-    }
-    connection.query(sql, [teamData.team], (err, result) => {
-      connection.release();
-      if (err) return callback(err);
-      return callback(null, result);
-    });
-  })
-
-};
-
-const updateTeam = (id, teamData, callback) => {
-  const sql = `UPDATE tbl_team SET fld_title = ? WHERE id = ?`;
-  db.getConnection((err, connection) => {
-    if (err) {
-      console.error("DB connection error:", err);
-      return callback(err, null);
-    }
-    connection.query(sql, [teamData.team, id], (err, result) => {
-      connection.release();
-      if (err) return callback(err);
-      return callback(null, result);
-    });
-  })
-};
-
-const updateTeamStatus = (teamId, status, callback) => {
-  const sql = `UPDATE tbl_team SET status = ? WHERE id = ?`;
-  const params = [status, teamId];
-
-  db.getConnection((err, connection) => {
-    if (err) {
-      console.error("DB connection error:", err);
-      return callback(err, null);
-    }
-
-    connection.query(sql, params, (queryErr, results) => {
-      connection.release(); // release AFTER query completes
-      if (queryErr) {
-        console.error("Query error:", queryErr);
-        return callback(queryErr, null);
-      }
-
-      callback(null, results);
     });
   });
 };
+
+// Get all teams
+const getAllTeams = (callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err, null);
+
+    const sql = `
+      SELECT * FROM tbl_team
+      ORDER BY fld_addedon DESC
+    `;
+
+    connection.query(sql, (queryErr, results) => {
+      connection.release();
+      if (queryErr) return callback(queryErr, null);
+      return callback(null, results);
+    });
+  });
+};
+
+// Add a new team
+const addTeam = (teamData, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    const sql = `INSERT INTO tbl_team (fld_title, fld_addedon, status) VALUES (?, NOW(), 'Active')`;
+
+    connection.query(sql, [teamData.team], (queryErr, result) => {
+      connection.release();
+      if (queryErr) return callback(queryErr);
+      return callback(null, result);
+    });
+  });
+};
+
+// Update team title
+const updateTeam = (id, teamData, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    const sql = `UPDATE tbl_team SET fld_title = ? WHERE id = ?`;
+
+    connection.query(sql, [teamData.team, id], (queryErr, result) => {
+      connection.release();
+      if (queryErr) return callback(queryErr);
+      return callback(null, result);
+    });
+  });
+};
+
+// Update team status
+const updateTeamStatus = (teamId, status, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    const sql = `UPDATE tbl_team SET status = ? WHERE id = ?`;
+
+    connection.query(sql, [status, teamId], (queryErr, result) => {
+      connection.release();
+      if (queryErr) return callback(queryErr);
+      return callback(null, result);
+    });
+  });
+};
+
 
 const getAllDomains = (callback) => {
   const sql = `
@@ -109,20 +96,25 @@ const getAllDomains = (callback) => {
     FROM tbl_domain_pref
     ORDER BY id DESC
   `;
+
   db.getConnection((err, connection) => {
     if (err) {
-      console.error("DB connection error:", err);
+      console.error("DB connection error (getAllDomains):", err);
       return callback(err, null);
     }
-    connection.query(sql, [], (err, results) => {
-      connection.release();
-      if (err) return callback(err, null);
-  
+
+    connection.query(sql, [], (error, results) => {
+      connection.release(); // Important to release the connection
+      if (error) {
+        console.error("Query error (getAllDomains):", error);
+        return callback(error, null);
+      }
+
       return callback(null, results);
     });
-  })
-
+  });
 };
+
 
 const getAllSubjectAreas = (callback) => {
   const query = `
@@ -181,7 +173,7 @@ const getAdmin = (type, status, callback) => {
   `;
   let params = [status];
 
-  if (type !== 'BOTH') {
+  if (type !== "BOTH") {
     query += ` AND fld_admin_type = ?`;
     params.push(type);
   } else {
@@ -204,7 +196,6 @@ const getAdmin = (type, status, callback) => {
     });
   });
 };
-
 
 const getPlanDetails = (callback) => {
   const query = `
@@ -249,10 +240,8 @@ const getBookingDetailsWithRc = (id, callback) => {
       values.push(id);
     }
 
-
     sql += ` ORDER BY b.id DESC`;
     if (!id) {
-
     }
 
     connection.query(sql, values, (error, results) => {
@@ -267,7 +256,6 @@ const getBookingDetailsWithRc = (id, callback) => {
     });
   });
 };
-
 
 const getConsultantSettingData = (consultantId, callback) => {
   db.getConnection((err, connection) => {
@@ -330,8 +318,8 @@ const fetchTimezones = (viewtype = "", callback) => {
         formattedList[index] = tz;
       } else {
         const abbr = now.zoneAbbr(); // e.g., IST
-        const offset = now.format('Z'); // e.g., +05:30
-        const time = now.format('hh:mm A'); // e.g., 02:25 PM
+        const offset = now.format("Z"); // e.g., +05:30
+        const time = now.format("hh:mm A"); // e.g., 02:25 PM
         formattedList[index] = `${tz}  ${abbr} ${offset}  ${time}`;
       }
 
@@ -343,8 +331,6 @@ const fetchTimezones = (viewtype = "", callback) => {
     callback(error, null);
   }
 };
-
-
 
 const getBookingData = (params, callback) => {
   try {
@@ -366,7 +352,7 @@ const getBookingData = (params, callback) => {
         verifyOtpUrl = "",
         hideSubOption = "",
         clientId = "",
-        disabledBookingId = ""
+        disabledBookingId = "",
       } = params;
 
       let sql = `
@@ -390,13 +376,14 @@ const getBookingData = (params, callback) => {
         values.push(bookingId);
       }
 
-      if (consultantId && checkType !== 'CHECK_BOTH') {
+      if (consultantId && checkType !== "CHECK_BOTH") {
         sql += " AND b.fld_consultantid = ?";
         values.push(consultantId);
       }
 
-      if (checkType === 'CHECK_BOTH') {
-        sql += " AND (b.fld_consultantid = ? OR b.fld_secondary_consultant_id = ? OR b.fld_third_consultantid = ?)";
+      if (checkType === "CHECK_BOTH") {
+        sql +=
+          " AND (b.fld_consultantid = ? OR b.fld_secondary_consultant_id = ? OR b.fld_third_consultantid = ?)";
         values.push(consultantId, consultantId, consultantId);
       }
 
@@ -416,7 +403,8 @@ const getBookingData = (params, callback) => {
       }
 
       if (status == "Reject") {
-        sql += " AND b.fld_consultation_sts != 'Reject' AND b.fld_consultation_sts != 'Rescheduled'";
+        sql +=
+          " AND b.fld_consultation_sts != 'Reject' AND b.fld_consultation_sts != 'Rescheduled'";
       }
 
       if (showAcceptedCall === "Yes") {
@@ -448,7 +436,8 @@ const getBookingData = (params, callback) => {
       }
 
       if (hideSubOption) {
-        sql += " AND (b.fld_consultant_another_option = 'CONSULTANT' OR b.fld_consultant_another_option IS NULL)";
+        sql +=
+          " AND (b.fld_consultant_another_option = 'CONSULTANT' OR b.fld_consultant_another_option IS NULL)";
       }
 
       sql += ` ORDER BY b.id ${orderBy}`;
@@ -475,7 +464,7 @@ const getRcCallBookingRequest = (params, callback) => {
         consultantId = "",
         selectedDate = "",
         selectedSlot = "",
-        status = ""
+        status = "",
       } = params;
 
       let sql = `
@@ -549,6 +538,66 @@ const getAdminById = (adminId, callback) => {
   });
 };
 
+const getMessagesByBookingId = (bookingId, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("Connection error:", err);
+      return callback(err, null);
+    }
+
+    const query = `
+        SELECT tbl_booking_chat.* , tbl_admin.fld_name as sender_name 
+        FROM tbl_booking_chat
+        LEFT JOIN tbl_admin ON tbl_booking_chat.fld_sender_id = tbl_admin.id
+        WHERE tbl_booking_chat.fld_bookingid = ?
+        ORDER BY tbl_booking_chat.fld_addedon ASC
+      `;
+
+    connection.query(query, [bookingId], (queryErr, results) => {
+      connection.release(); 
+
+      if (queryErr) {
+        console.error("Query error:", queryErr);
+        return callback(queryErr, null);
+      }
+
+      return callback(null, results);
+    });
+  });
+};
+
+const getMessageCount = (bookingid, callback) => {
+  try {
+    db.getConnection((err, connection) => {
+      if (err) return callback(err);
+
+      const query = `SELECT COUNT(*) AS count FROM tbl_booking_chat WHERE fld_bookingid = ?`;
+      connection.query(query, [bookingid], (err, results) => {
+        connection.release();
+        callback(err, results);
+      });
+    });
+  } catch (error) {
+    callback(error);
+  }
+};
+
+const insertChatMessage = (data, callback) => {
+  try {
+    db.getConnection((err, connection) => {
+      if (err) return callback(err);
+
+      const query = `INSERT INTO tbl_booking_chat SET ?`;
+      connection.query(query, data, (err, results) => {
+        connection.release();
+        callback(err, results);
+      });
+    });
+  } catch (error) {
+    callback(error);
+  }
+};
+
 module.exports = {
   getAllTeams,
   getAllActiveTeams,
@@ -568,4 +617,7 @@ module.exports = {
 
   getAdmin,
   getAdminById,
+  getMessagesByBookingId,
+  getMessageCount,
+  insertChatMessage,
 };
