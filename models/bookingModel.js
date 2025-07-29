@@ -1429,6 +1429,59 @@ const getExternalCallCountByBookingId = (bookingId, callback) => {
   });
 };
 
+const getBookingStatusHistory = (bookingId,status, callback) => {
+  const sql = `
+    SELECT * FROM tbl_booking_sts_history WHERE fld_booking_id = ? AND status = ? ORDER BY id DESC
+  `;
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(sql, [bookingId,status], (queryErr, results) => {
+      connection.release();
+      if (queryErr) return callback(queryErr);
+      return callback(null, results);
+    });
+  });
+};
+
+const getAllClientBookings = (clientId, callback) => {
+  const query = `
+    SELECT 
+      tbl_booking.*, 
+      tbl_admin.fld_client_code AS admin_code,
+      tbl_admin.fld_name AS admin_name,
+      tbl_admin.fld_email AS admin_email,
+      tbl_admin.fld_profile_image AS profile_image,
+      tbl_admin.fld_client_code AS consultant_code,
+      tbl_user.fld_user_code AS user_code,
+      tbl_user.fld_name AS user_name,
+      tbl_user.fld_email AS user_email,
+      tbl_user.fld_decrypt_password AS user_pass,
+      tbl_user.fld_country_code AS user_country_code,
+      tbl_user.fld_phone AS user_phone,
+      tbl_user.fld_address,
+      tbl_user.fld_city,
+      tbl_user.fld_pincode,
+      tbl_user.fld_country
+    FROM tbl_booking
+    LEFT JOIN tbl_admin ON tbl_booking.fld_consultantid = tbl_admin.id
+    LEFT JOIN tbl_user ON tbl_booking.fld_userid = tbl_user.id
+    WHERE tbl_booking.fld_client_id = ?
+    ORDER BY tbl_booking.id DESC
+  `;
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(query, [clientId], (error, results) => {
+      connection.release();
+      if (error) return callback(error);
+      callback(null, results || []);
+    });
+  });
+};
+
 
 module.exports = {
   getBookings,
@@ -1464,4 +1517,6 @@ module.exports = {
   updateExternalCallsStatus,
   getFullBookingData,
   getExternalCallCountByBookingId,
+  getBookingStatusHistory,
+  getAllClientBookings,
 };

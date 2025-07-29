@@ -40,6 +40,8 @@ router.post("/rescheduleOtherBookings", bookingController.rescheduleOtherBooking
 router.post("/reassignToConsultant", bookingController.reassignToConsultant);
 router.post("/updateConsultationStatus",upload.any(), bookingController.updateConsultationStatus);
 router.get("/getExternalCallCount", bookingController.getExternalCallCount);
+router.get("/statusHistory", bookingController.getBookingStatusHistory);
+router.get("/getAllClientBookingData", bookingController.getAllClientBookingData);
 
 
 

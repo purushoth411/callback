@@ -2027,6 +2027,66 @@ const getExternalCallCount = (req, res) => {
   }
 };
 
+const getBookingStatusHistory = async (req, res) => {
+  try {
+    const { bookingId, status } = req.query;
+
+    if (!bookingId || !status) {
+    return res
+      .status(400)
+      .json({ status: false, message: "Missing booking ID or Status" });
+  }
+
+  bookingModel.getBookingStatusHistory(bookingId,status, (err, results) => {
+    if (err) {
+      console.error("Error fetching booking status history:", err);
+      return res.status(500).json({ status: false, message: "Database error" });
+    }
+
+    return res.status(200).json({ status: true, data: results });
+  });
+
+  
+
+   
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch status history", details: err });
+  }
+};
+
+const getAllClientBookingData = (req, res) => {
+  const { clientId } = req.query;
+
+  try {
+    if (!clientId) {
+      return res
+        .status(400)
+        .json({ status: false, message: "clientId is required" });
+    }
+
+    // Call model to get booking data
+    bookingModel.getAllClientBookings(clientId, (err, results) => {
+      if (err) {
+        console.error("Error in getAllClientBookings:", err);
+        return res.status(500).json({ status: false, message: "Server error" });
+      }
+
+      if (!results || results.length === 0) {
+        return res
+          .status(404)
+          .json({ status: false, message: "No bookings found" });
+      }
+
+      res.status(200).json({ status: true, data: results });
+    });
+  } catch (error) {
+    console.error("Exception in getAllClientBookingData:", error);
+    res.status(500).json({ status: false, message: "Unexpected error" });
+  }
+};
+
+
+
 module.exports = {
   fetchBookings,
   getBookingHistory,
@@ -2053,4 +2113,6 @@ module.exports = {
   reassignToConsultant,
   updateConsultationStatus,
   getExternalCallCount,
+  getBookingStatusHistory,
+  getAllClientBookingData,
 };
