@@ -1344,110 +1344,91 @@ const getExternalCallInfo = (id = 0, bookingId = 0, callback) => {
   });
 };
 
- const updateExternalCallsStatus= (bookingId, updateData, callback) => {
-    const connection = db.getConnection();
-    
+const updateExternalCallsStatus = (bookingId, updateData, callback) => {
+  if (!bookingId || typeof updateData !== 'object' || Object.keys(updateData).length === 0) {
+    return callback(new Error("Invalid bookingId or updateData"));
+  }
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
     try {
       const fields = Object.keys(updateData);
       const values = Object.values(updateData);
       const setClause = fields.map(field => `${field} = ?`).join(', ');
-      
+
       const query = `UPDATE tbl_external_calls SET ${setClause} WHERE fld_booking_id = ?`;
       values.push(bookingId);
-      
-      connection.query(query, values, (err, results) => {
+
+      connection.query(query, values, (error, results) => {
         connection.release();
-        
-        if (err) {
-          return callback(err);
-        }
-        
+        if (error) return callback(error);
         callback(null, results);
       });
     } catch (error) {
       connection.release();
       callback(error);
     }
-  };
-
-   const getClientIdByBookingId=(bookingId, callback) => {
-    const connection = db.getConnection();
-    
-    try {
-      const query = 'SELECT fld_client_id FROM tbl_booking WHERE id = ?';
-      
-      connection.query(query, [bookingId], (err, results) => {
-        connection.release();
-        
-        if (err) {
-          return callback(err, null);
-        }
-        
-        if (results.length === 0) {
-          return callback(null, null);
-        }
-        
-        callback(null, results[0]);
-      });
-    } catch (error) {
-      connection.release();
-      callback(error, null);
-    }
-  };
-
-   const updateBookingMessageId= (bookingId, messageId, callback) => {
-    const connection = db.getConnection();
-    
-    try {
-      const query = 'UPDATE tbl_booking SET fld_message_id = ? WHERE id = ?';
-      
-      connection.query(query, [messageId, bookingId], (err, results) => {
-        connection.release();
-        
-        if (err) {
-          return callback(err);
-        }
-        
-        callback(null, results);
-      });
-    } catch (error) {
-      connection.release();
-      callback(error);
-    }
-  };
+  });
+};
 
 
-  const getConsultantInfo=(bookingId, callback) => {
-    const connection = db.getConnection();
-    
+
+const getFullBookingData = (bookingId, callback) => {
+  if (!bookingId) {
+    return callback(new Error("Invalid bookingId"), null);
+  }
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err, null);
+
     try {
       const query = `
         SELECT 
-          fld_consultantid,
-          fld_call_request_id,
-          fld_rc_call_request_id
-        FROM tbl_booking 
-        WHERE id = ?
+          b.*,
+          u.fld_name AS user_name,
+          u.fld_email AS user_email,
+          u.fld_phone AS user_phone,
+          a.fld_name AS admin_name
+        FROM tbl_booking b
+        LEFT JOIN tbl_users u ON b.fld_userid = u.id
+        LEFT JOIN tbl_admin a ON b.fld_consultantid = a.id
+        WHERE b.id = ?
       `;
-      
-      connection.query(query, [bookingId], (err, results) => {
+
+      connection.query(query, [bookingId], (error, results) => {
         connection.release();
-        
-        if (err) {
-          return callback(err, null);
-        }
-        
-        if (results.length === 0) {
-          return callback(null, null);
-        }
-        
-        callback(null, results[0]);
+        if (error) return callback(error, null);
+        callback(null, results[0] || null);
       });
     } catch (error) {
       connection.release();
       callback(error, null);
     }
-  };
+  });
+};
+
+const getExternalCallCountByBookingId = (bookingId, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    try {
+      const query = `SELECT COUNT(*) AS totalrow FROM tbl_external_calls WHERE fld_booking_id = ?`;
+
+      connection.query(query, [bookingId], (error, results) => {
+        connection.release();
+
+        if (error) return callback(error);
+        const count = results[0]?.totalrow || 0;
+        callback(null, count);
+      });
+    } catch (error) {
+      connection.release();
+      callback(error);
+    }
+  });
+};
+
 
 module.exports = {
   getBookings,
@@ -1481,7 +1462,6 @@ module.exports = {
   getExternalCallInfo,
   getOtherBookingData,
   updateExternalCallsStatus,
-  getClientIdByBookingId,
-  updateBookingMessageId,
-  getConsultantInfo,
+  getFullBookingData,
+  getExternalCallCountByBookingId,
 };

@@ -2,6 +2,19 @@ const express = require('express');
 const router = express.Router();
 const bookingController = require('../controllers/bookingController');
 
+const multer = require('multer');
+const path = require('path');
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, '../uploads'));
+  },
+  filename: function (req, file, cb) {
+    const uniqueName = Date.now() + '_' + file.originalname.replace(/[^a-zA-Z0-9.]/g, "");
+    cb(null, uniqueName);
+  }
+});
+const upload = multer({ storage });
 
 router.post('/fetchBooking', bookingController.fetchBookings);
 router.get('/history/:id', bookingController.getBookingHistory);
@@ -25,6 +38,9 @@ router.post("/reassignComment", bookingController.reassignComment);
 router.get("/getExternalCallByBookingId", bookingController.getExternalCallByBookingId);
 router.post("/rescheduleOtherBookings", bookingController.rescheduleOtherBookings);
 router.post("/reassignToConsultant", bookingController.reassignToConsultant);
+router.post("/updateConsultationStatus",upload.any(), bookingController.updateConsultationStatus);
+router.get("/getExternalCallCount", bookingController.getExternalCallCount);
+
 
 
 
