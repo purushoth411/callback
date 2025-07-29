@@ -19,10 +19,12 @@ router.post("/fetchBookingById", bookingController.fetchBookingById);
 router.post("/deleteBookingById", bookingController.deleteBookingById);
 router.post("/setAsConverted", bookingController.setAsConverted);
 router.post("/updateStatusByCrm", bookingController.updateStatusByCrm);
-router.get("/getBookingData", bookingController.getBookingData);
+router.get("/getBookingData", bookingController.getBookingDataNew);
 router.post("/markAsConfirmByClient", bookingController.markAsConfirmByClient);
 router.post("/reassignComment", bookingController.reassignComment);
 router.get("/getExternalCallByBookingId", bookingController.getExternalCallByBookingId);
+router.post("/rescheduleOtherBookings", bookingController.rescheduleOtherBookings);
+router.post("/reassignToConsultant", bookingController.reassignToConsultant);
 
 
 
