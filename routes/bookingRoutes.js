@@ -44,6 +44,7 @@ router.get("/statusHistory", bookingController.getBookingStatusHistory);
 router.get("/getAllClientBookingData", bookingController.getAllClientBookingData);
 router.post("/assignExternalCall", bookingController.assignExternalCall);
 router.post("/checkCompletedCall", bookingController.checkCompletedCall);
+router.post("/updateReassignCallStatus", bookingController.updateReassignCallStatus);
 
 
 

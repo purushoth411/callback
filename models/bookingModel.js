@@ -1504,7 +1504,7 @@ const getLatestCompletedBooking = (consultantId, email, callback) => {
   });
 };
 
-const getLatestBookingStatusHistory = (bookingId, status, callback) => {
+const getLatestCompletedBookingStatusHistory = (bookingId, status, callback) => {
   const sql = `
     SELECT *
     FROM tbl_booking_sts_history
@@ -1525,7 +1525,7 @@ const getLatestBookingStatusHistory = (bookingId, status, callback) => {
   });
 };
 
-const getLatestBookingHistory = (bookingId, callback) => {
+const getLatestCompletedBookingHistory = (bookingId, callback) => {
   const sql = `
     SELECT 
       id,
@@ -1556,6 +1556,31 @@ const getLatestBookingHistory = (bookingId, callback) => {
     });
   });
 };
+
+const checkConflictingBookings = (consultantId, bookingDate, bookingslot, slotVariants, callback) => {
+  const sql = `
+    SELECT * FROM tbl_booking
+    WHERE fld_consultantid = ?
+      AND fld_booking_date = ?
+      AND (
+        fld_booking_slot IN (?, ?, ?)
+        OR FIND_IN_SET(?, fld_slots_booked)
+      )
+  `;
+
+  const params = [consultantId, bookingDate, ...slotVariants, bookingslot];
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err, null);
+
+    connection.query(sql, params, (queryErr, results) => {
+      connection.release();
+      if (queryErr) return callback(queryErr, null);
+      callback(null, results);
+    });
+  });
+};
+
 
 
 module.exports = {
@@ -1594,8 +1619,8 @@ module.exports = {
   getExternalCallCountByBookingId,
   getBookingStatusHistory,
   getAllClientBookings,
- 
   getLatestCompletedBooking,
-  getLatestBookingStatusHistory,
-  getLatestBookingHistory,
+  getLatestCompletedBookingStatusHistory,
+  getLatestCompletedBookingHistory,
+  checkConflictingBookings,
 };

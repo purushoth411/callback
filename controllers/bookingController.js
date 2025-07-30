@@ -2220,7 +2220,7 @@ const checkCompletedCall = (req, res) => {
 
       if (teamId !== currentCrmTeamId) {
         // Team doesn't match, check if call completed
-        bookingModel.getLatestBookingStatusHistory(bookingId, "Completed", (err, statusHist) => {
+        bookingModel.getLatestCompletedBookingStatusHistory(bookingId, "Completed", (err, statusHist) => {
           const completedDate = statusHist?.[0]?.fld_call_completed_date;
 
           if (completedDate) {
@@ -2229,7 +2229,7 @@ const checkCompletedCall = (req, res) => {
           }
 
           // Fallback: Check overall history
-          bookingModel.getLatestBookingHistory(bookingId, (err, overallHist) => {
+          bookingModel.getLatestCompletedBookingHistory(bookingId, (err, overallHist) => {
             const historyRow = overallHist?.[0];
             const fallbackDate = historyRow?.fld_addedon;
 
@@ -2247,6 +2247,95 @@ const checkCompletedCall = (req, res) => {
       }
     });
   });
+};
+
+const updateReassignCallStatus = (req, res) => {
+  const { bookingid, consultant_id, bookingslot, bookingdate,user } = req.body;
+
+  if (!bookingid || !consultant_id) {
+    return res.json({ status: false, message: "Missing booking ID or consultant ID." });
+  }
+
+  const inputTime = moment(bookingslot, "h:mm A");
+  const timeSlotVariants = [
+    inputTime.format("h:mm A"),
+    inputTime.clone().subtract(30, "minutes").format("h:mm A"),
+    inputTime.clone().add(30, "minutes").format("h:mm A")
+  ];
+
+  bookingModel.checkConflictingBookings(
+    consultant_id,
+    bookingdate,
+    bookingslot,
+    timeSlotVariants,
+    (err, conflicts) => {
+      if (err) {
+        return res.json({ status: false, message: "Error checking for conflicting bookings." });
+      }
+
+      if (Array.isArray(conflicts) && conflicts.length > 0) {
+        return res.json({ status: false, message: "Consultant already has a call around this time." });
+      }
+
+      const updateData = {
+        fld_consultantid: consultant_id,
+        fld_consultant_another_option: ''
+      };
+
+      bookingModel.updateBooking(bookingid, updateData, (err, success) => {
+        if (err || !success) {
+          return res.json({ status: false, message: "Failed to update booking." });
+        }
+
+        bookingModel.getBookingRowById(bookingid, (err, bookingInfo) => {
+          if (err || !bookingInfo) {
+            return res.json({ status: false, message: "Failed to fetch booking details." });
+          }
+
+          bookingModel.getAdminById(consultant_id, (err, adminInfo) => {
+            if (err || !adminInfo) {
+              return res.json({ status: false, message: "Failed to fetch consultant info." });
+            }
+
+            const consultantName = adminInfo.fld_name || "Consultant";
+            const adminType = adminInfo.fld_admin_type || "CONSULTANT";
+            const currentDate = moment().format("D MMM YYYY");
+            const currentTime = moment().format("h:mm A");
+            const reassignedBy = req.user?.fld_name || "Adminn";
+
+            const comment = `Call Reassigned by consultant ${reassignedBy} to consultant ${consultantName} on ${currentDate} at ${currentTime}`;
+
+            const historyData1 = {
+              fld_booking_id: bookingid,
+              fld_comment: comment,
+              fld_notif_for: adminType,
+              fld_notif_for_id: consultant_id,
+              fld_addedon: moment().format("YYYY-MM-DD")
+            };
+
+            bookingModel.insertBookingHistory(historyData1, (err, _) => {
+              if (err) return res.json({ status: false, message: "Failed to log reassignment history (consultant)." });
+
+              const historyData2 = {
+                fld_booking_id: bookingid,
+                fld_comment: comment,
+                fld_notif_for: "EXECUTIVE",
+                fld_notif_for_id: bookingInfo.fld_addedby,
+                view_sts: "HIDE",
+                fld_addedon: moment().format("YYYY-MM-DD")
+              };
+
+              bookingModel.insertBookingHistory(historyData2, (err, _) => {
+                if (err) return res.json({ status: false, message: "Failed to log reassignment history (executive)." });
+
+                return res.json({ status: true, message: "Call reassigned successfully." });
+              });
+            });
+          });
+        });
+      });
+    }
+  );
 };
 
 
@@ -2281,4 +2370,5 @@ module.exports = {
   getAllClientBookingData,
   assignExternalCall,
   checkCompletedCall,
+  updateReassignCallStatus,
 };
