@@ -1482,6 +1482,81 @@ const getAllClientBookings = (clientId, callback) => {
   });
 };
 
+const getLatestCompletedBooking = (consultantId, email, callback) => {
+  const sql = `
+    SELECT * FROM tbl_booking 
+    WHERE fld_consultantid = ? 
+    AND fld_email = ? 
+    AND fld_consultation_sts = 'Completed' 
+    AND fld_call_request_sts = 'Completed' 
+    AND fld_sale_type = 'Presales' 
+    ORDER BY id DESC LIMIT 1
+  `;
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(sql, [consultantId, email], (queryErr, results) => {
+      connection.release();
+      if (queryErr) return callback(queryErr);
+      callback(null, results);
+    });
+  });
+};
+
+const getLatestBookingStatusHistory = (bookingId, status, callback) => {
+  const sql = `
+    SELECT *
+    FROM tbl_booking_sts_history
+    WHERE fld_booking_id = ?
+      AND status = ?
+    ORDER BY id DESC
+    LIMIT 1
+  `;
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(sql, [bookingId, status], (queryErr, results) => {
+      connection.release();
+      if (queryErr) return callback(queryErr);
+      return callback(null, results);
+    });
+  });
+};
+
+const getLatestBookingHistory = (bookingId, callback) => {
+  const sql = `
+    SELECT 
+      id,
+      fld_booking_id,
+      fld_comment,
+      fld_rescheduled_date_time,
+      fld_addedon,
+      fld_notif_view_sts,
+      fld_notif_for,
+      fld_notif_for_id,
+      view_sts,
+      crmIdsNotifi,
+      fld_consultantid
+    FROM tbl_booking_overall_history
+    WHERE fld_booking_id = ?
+      AND fld_comment LIKE '%Call Completed by%'
+    ORDER BY id DESC
+    LIMIT 1
+  `;
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(sql, [bookingId], (queryErr, results) => {
+      connection.release();
+      if (queryErr) return callback(queryErr);
+      return callback(null, results);
+    });
+  });
+};
+
 
 module.exports = {
   getBookings,
@@ -1519,4 +1594,8 @@ module.exports = {
   getExternalCallCountByBookingId,
   getBookingStatusHistory,
   getAllClientBookings,
+ 
+  getLatestCompletedBooking,
+  getLatestBookingStatusHistory,
+  getLatestBookingHistory,
 };

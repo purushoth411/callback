@@ -2023,7 +2023,9 @@ const getExternalCallCount = (req, res) => {
       return res.status(200).json({ bookingId, totalExternalCalls: count });
     });
   } catch (error) {
-    return res.status(500).json({ error: "Unexpected error", details: error.message });
+    return res
+      .status(500)
+      .json({ error: "Unexpected error", details: error.message });
   }
 };
 
@@ -2032,25 +2034,25 @@ const getBookingStatusHistory = async (req, res) => {
     const { bookingId, status } = req.query;
 
     if (!bookingId || !status) {
-    return res
-      .status(400)
-      .json({ status: false, message: "Missing booking ID or Status" });
-  }
-
-  bookingModel.getBookingStatusHistory(bookingId,status, (err, results) => {
-    if (err) {
-      console.error("Error fetching booking status history:", err);
-      return res.status(500).json({ status: false, message: "Database error" });
+      return res
+        .status(400)
+        .json({ status: false, message: "Missing booking ID or Status" });
     }
 
-    return res.status(200).json({ status: true, data: results });
-  });
+    bookingModel.getBookingStatusHistory(bookingId, status, (err, results) => {
+      if (err) {
+        console.error("Error fetching booking status history:", err);
+        return res
+          .status(500)
+          .json({ status: false, message: "Database error" });
+      }
 
-  
-
-   
+      return res.status(200).json({ status: true, data: results });
+    });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch status history", details: err });
+    res
+      .status(500)
+      .json({ error: "Failed to fetch status history", details: err });
   }
 };
 
@@ -2090,17 +2092,26 @@ const assignExternalCall = (req, res) => {
     const { consultantName, bookingId } = req.body;
 
     if (!consultantName || !bookingId) {
-      return res.status(400).json({ status: false, message: "Missing consultantName or bookingId" });
+      return res
+        .status(400)
+        .json({
+          status: false,
+          message: "Missing consultantName or bookingId",
+        });
     }
 
     // Step 1: Fetch booking
     bookingModel.getBookingRowById(bookingId, (err, booking) => {
       if (err) {
         console.error("Booking fetch error:", err);
-        return res.status(500).json({ status: false, message: "DB error while fetching booking" });
+        return res
+          .status(500)
+          .json({ status: false, message: "DB error while fetching booking" });
       }
       if (!booking) {
-        return res.status(404).json({ status: false, message: "Booking not found" });
+        return res
+          .status(404)
+          .json({ status: false, message: "Booking not found" });
       }
 
       const consultantId = booking.fld_consultantid;
@@ -2118,19 +2129,23 @@ const assignExternalCall = (req, res) => {
       bookingModel.insertExternalCall(externalCallData, (err, insertedId) => {
         if (err) {
           console.error("Insert external call failed:", err);
-          return res.status(500).json({ status: false, message: "Failed to insert external call" });
+          return res
+            .status(500)
+            .json({ status: false, message: "Failed to insert external call" });
         }
 
         // Step 3: Get admin info (main consultant)
         bookingModel.getAdminById(consultantId, (err, admin) => {
           if (err || !admin) {
             console.error("Admin fetch error:", err);
-            return res.status(500).json({ status: false, message: "Consultant info fetch failed" });
+            return res
+              .status(500)
+              .json({ status: false, message: "Consultant info fetch failed" });
           }
 
-         const now = moment();
-const formattedDate = now.format("DD-MMM-YYYY");  // e.g., "29-Jul-2025"
-const formattedTime = now.format("hh:mm A"); 
+          const now = moment();
+          const formattedDate = now.format("DD-MMM-YYYY"); // e.g., "29-Jul-2025"
+          const formattedTime = now.format("hh:mm A");
 
           const comment = `Call External assigned to consultant ${consultantName} by ${admin.fld_name} on ${formattedDate} at ${formattedTime}`;
 
@@ -2146,18 +2161,32 @@ const formattedTime = now.format("hh:mm A");
           bookingModel.insertBookingHistory(historyData, (err, historyId) => {
             if (err) {
               console.error("History insert failed:", err);
-              return res.status(500).json({ status: false, message: "Failed to log history" });
+              return res
+                .status(500)
+                .json({ status: false, message: "Failed to log history" });
             }
 
             // Step 5: Update booking status
-            bookingModel.updateBooking(bookingId, { fld_call_external_assign: "Yes" }, (err, updated) => {
-              if (err || !updated) {
-                console.error("Update booking failed:", err);
-                return res.status(500).json({ status: false, message: "Failed to update booking status" });
-              }
+            bookingModel.updateBooking(
+              bookingId,
+              { fld_call_external_assign: "Yes" },
+              (err, updated) => {
+                if (err || !updated) {
+                  console.error("Update booking failed:", err);
+                  return res
+                    .status(500)
+                    .json({
+                      status: false,
+                      message: "Failed to update booking status",
+                    });
+                }
 
-              return res.json({ status: true, message: "External consultant assigned successfully" });
-            });
+                return res.json({
+                  status: true,
+                  message: "External consultant assigned successfully",
+                });
+              }
+            );
           });
         });
       });
@@ -2167,6 +2196,60 @@ const formattedTime = now.format("hh:mm A");
     return res.status(500).json({ status: false, message: "Internal error" });
   }
 };
+
+const checkCompletedCall = (req, res) => {
+  const { primaryConsultantId, clientEmail, saleType, user } = req.body;
+
+  if (saleType !== "Presales") return res.send("call not completed");
+
+  bookingModel.getLatestCompletedBooking(primaryConsultantId, clientEmail, (err, bookings) => {
+    if (err || !bookings || bookings.length === 0) return res.send("call not completed");
+
+    const booking = bookings[0];
+    const bookingId = booking.id;
+    const clientName = booking.fld_name;
+    const teamId = booking.fld_teamid;
+    const bookingConsultantId = booking.fld_consultantid;
+
+    // Get current logged-in CRM team ID
+    bookingModel.getAdminById(user.fld_consultantid, (err, consultantData) => {
+      if (err || !consultantData) return res.status(500).send("consultant fetch error");
+
+      const currentCrmTeamId = user.fld_team_id;
+      const consultantName = consultantData.fld_name;
+
+      if (teamId !== currentCrmTeamId) {
+        // Team doesn't match, check if call completed
+        bookingModel.getLatestBookingStatusHistory(bookingId, "Completed", (err, statusHist) => {
+          const completedDate = statusHist?.[0]?.fld_call_completed_date;
+
+          if (completedDate) {
+            const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment(completedDate).format("D MMM YYYY")}`;
+            return res.send(`${msg}||${bookingConsultantId}||${primaryConsultantId}`);
+          }
+
+          // Fallback: Check overall history
+          bookingModel.getLatestBookingHistory(bookingId, (err, overallHist) => {
+            const historyRow = overallHist?.[0];
+            const fallbackDate = historyRow?.fld_addedon;
+
+            if (fallbackDate) {
+              const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment(fallbackDate).format("D MMM YYYY")}`;
+              return res.send(`${msg}||${historyRow.fld_consultantid}||${primaryConsultantId}`);
+            } else {
+              return res.send("call not completed");
+            }
+          });
+        });
+      } else {
+        // Same team, allow call addition
+        return res.send("add call");
+      }
+    });
+  });
+};
+
+
 
 module.exports = {
   fetchBookings,
@@ -2197,4 +2280,5 @@ module.exports = {
   getBookingStatusHistory,
   getAllClientBookingData,
   assignExternalCall,
+  checkCompletedCall,
 };
