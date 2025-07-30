@@ -42,6 +42,7 @@ router.post("/updateConsultationStatus",upload.any(), bookingController.updateCo
 router.get("/getExternalCallCount", bookingController.getExternalCallCount);
 router.get("/statusHistory", bookingController.getBookingStatusHistory);
 router.get("/getAllClientBookingData", bookingController.getAllClientBookingData);
+router.post("/assignExternalCall", bookingController.assignExternalCall);
 
 
 

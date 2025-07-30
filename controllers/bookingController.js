@@ -2085,7 +2085,88 @@ const getAllClientBookingData = (req, res) => {
   }
 };
 
+const assignExternalCall = (req, res) => {
+  try {
+    const { consultantName, bookingId } = req.body;
 
+    if (!consultantName || !bookingId) {
+      return res.status(400).json({ status: false, message: "Missing consultantName or bookingId" });
+    }
+
+    // Step 1: Fetch booking
+    bookingModel.getBookingRowById(bookingId, (err, booking) => {
+      if (err) {
+        console.error("Booking fetch error:", err);
+        return res.status(500).json({ status: false, message: "DB error while fetching booking" });
+      }
+      if (!booking) {
+        return res.status(404).json({ status: false, message: "Booking not found" });
+      }
+
+      const consultantId = booking.fld_consultantid;
+      const callAddedBy = booking.fld_addedby;
+
+      // Step 2: Insert into tbl_external_calls
+      const externalCallData = {
+        fld_booking_id: bookingId,
+        fld_call_added_by: callAddedBy,
+        fld_consultation_sts: "Pending",
+        fld_call_request_sts: "Pending",
+        fld_added_on: new Date(),
+      };
+
+      bookingModel.insertExternalCall(externalCallData, (err, insertedId) => {
+        if (err) {
+          console.error("Insert external call failed:", err);
+          return res.status(500).json({ status: false, message: "Failed to insert external call" });
+        }
+
+        // Step 3: Get admin info (main consultant)
+        bookingModel.getAdminById(consultantId, (err, admin) => {
+          if (err || !admin) {
+            console.error("Admin fetch error:", err);
+            return res.status(500).json({ status: false, message: "Consultant info fetch failed" });
+          }
+
+         const now = moment();
+const formattedDate = now.format("DD-MMM-YYYY");  // e.g., "29-Jul-2025"
+const formattedTime = now.format("hh:mm A"); 
+
+          const comment = `Call External assigned to consultant ${consultantName} by ${admin.fld_name} on ${formattedDate} at ${formattedTime}`;
+
+          // Step 4: Insert into history
+          const historyData = {
+            fld_booking_id: bookingId,
+            fld_comment: comment,
+            fld_notif_for: admin.fld_admin_type,
+            fld_notif_for_id: process.env.DEFAULT_EXTERNAL_ASSIGN_ID || 0,
+            fld_addedon: new Date(),
+          };
+
+          bookingModel.insertBookingHistory(historyData, (err, historyId) => {
+            if (err) {
+              console.error("History insert failed:", err);
+              return res.status(500).json({ status: false, message: "Failed to log history" });
+            }
+
+            // Step 5: Update booking status
+            bookingModel.updateBooking(bookingId, { fld_call_external_assign: "Yes" }, (err, updated) => {
+              if (err || !updated) {
+                console.error("Update booking failed:", err);
+                return res.status(500).json({ status: false, message: "Failed to update booking status" });
+              }
+
+              return res.json({ status: true, message: "External consultant assigned successfully" });
+            });
+          });
+        });
+      });
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return res.status(500).json({ status: false, message: "Internal error" });
+  }
+};
 
 module.exports = {
   fetchBookings,
@@ -2115,4 +2196,5 @@ module.exports = {
   getExternalCallCount,
   getBookingStatusHistory,
   getAllClientBookingData,
+  assignExternalCall,
 };
