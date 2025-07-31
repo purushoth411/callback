@@ -25,6 +25,10 @@ router.post("/getBookingData", helperController.getBookingData);
 router.post("/getRcCallBookingRequest", helperController.getRcCallBookingRequest);
 router.get("/getMessageData", helperController.getMessageData);
 router.post("/sendMessage", helperController.chatSubmit);
+router.post("/fetchFollowerData", helperController.fetchFollowerData);
+router.post("/getFollowerConsultant", helperController.getFollowerConsultant);
+router.post("/addFollower", helperController.addFollower);
+router.post("/updateExternalBookingInfo", helperController.updateExternalBookingInfo);
 
 
 

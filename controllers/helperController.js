@@ -2,6 +2,7 @@
 const helperModel = require("../models/helperModel");
 const bookingModel = require("../models/bookingModel");
 const db = require("../config/db");
+const moment =require('moment');
 
 const getAllActiveTeams = (req, res) => {
   helperModel.getAllActiveTeams((err, teams) => {
@@ -429,7 +430,7 @@ const chatSubmit = (req, res) => {
         fld_view_status: "NO",
         fld_sender_id: sender_id,
         fld_receiver_id: receiver_id,
-        fld_addedon: new Date()
+        fld_addedon: moment().format('YYYY-MM-DD') 
       };
 
       helperModel.insertChatMessage(insertData, (insertErr, result) => {
@@ -446,6 +447,288 @@ const chatSubmit = (req, res) => {
     });
   });
 };
+
+const fetchFollowerData = (req, res) => {
+  const { id, follower_consultant_id, bookingid, consultantid, status } = req.body;
+
+  const filters = {
+    id,
+    follower_consultant_id,
+    bookingid,
+    consultantid,
+    status
+  };
+  try{
+
+  helperModel.getFollowerData(filters, (err, result) => {
+    if (err) {
+      console.error("DB Error:", err);
+      return res.status(500).json({
+        status: false,
+        message: 'Server Error',
+        data: null
+      });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Follower data fetched successfully',
+      data: result
+    });
+  });
+}catch (error) {
+    console.error('Error in follower fetch:', error);
+    res.status(500).json({ status: false, message: 'Internal Server Error' });
+  }
+};
+
+
+
+const getSaturdayPosition = (dateString) => {
+  const date = moment(dateString);
+  if (date.isoWeekday() !== 6) return false; // Not Saturday
+
+  const day = date.date();
+  let count = 0;
+
+  for (let i = 1; i <= day; i++) {
+    if (moment(date).date(i).isoWeekday() === 6) {
+      count++;
+    }
+  }
+
+  return count >= 1 && count <= 4 ? count : false;
+};
+
+const getEndTime = (startTime, hours, minutes) => {
+  const start = moment(startTime, 'h:mm A');
+  const end = start.clone().add(hours, 'hours').add(minutes, 'minutes');
+  return end.format('h:mm A');
+};
+
+const getFollowerConsultant = (req, res) => {
+  const { bookingid, user } = req.body;
+
+  if (!bookingid || !user) {
+    return res.status(400).json({ status: false, message: "Missing required params" });
+  }
+
+  bookingModel.getBookingRowById(bookingid, (err, bookingData) => {
+    if (err || !bookingData) {
+      return res.status(400).json({ status: false, message: "Invalid Booking ID", data: null });
+    }
+
+    const bookingDateStr = bookingData.fld_booking_date;
+    const bookingSlot = bookingData.fld_booking_slot;
+    const bookingMoment = moment(bookingDateStr, 'YYYY-MM-DD');
+    const bookindateSaturday = getSaturdayPosition(bookingDateStr);
+
+    helperModel.getAllActiveBothConsultants((err, consultants) => {
+      if (err) {
+        return res.status(500).json({ status: false, message: "Error fetching consultants" });
+      }
+
+      const availableConsultants = [];
+      const currentAdminId = user?.id || 1;
+
+      let index = 0;
+
+      const processConsultant = () => {
+        if (index >= consultants.length) {
+          return res.status(200).json({
+            status: true,
+            message: "Fetched follower consultants",
+            data: availableConsultants
+          });
+        }
+
+        const consultant = consultants[index++];
+        if (consultant.id == currentAdminId) {
+          return processConsultant(); // skip self
+        }
+
+        const params = {
+          consultantId: consultant.id,
+          selectedDate: bookingDateStr,
+          status: "Reject",
+          checkType: "CHECK_BOTH",
+          hideSubOption: "Yes"
+        };
+
+        helperModel.getBookingData(params, (err, bookingList) => {
+          const arrBookedSlots = [];
+
+          (bookingList || []).forEach(b => {
+            const startTime = b.fld_booking_slot;
+            const hoursMatch = b.fld_no_of_hours_for_call?.match(/(\d+(?:\.\d+)?)\s*Hour/);
+            const totalHours = parseFloat(hoursMatch?.[1] || 0);
+
+            const fullHours = Math.floor(totalHours);
+            const extraMinutes = Math.round((totalHours - fullHours) * 60);
+            const endTime = getEndTime(startTime, fullHours, extraMinutes);
+
+            let current = moment(startTime, 'h:mm A');
+            const finalEnd = moment(endTime, 'h:mm A');
+
+            while (current.isBefore(finalEnd)) {
+              arrBookedSlots.push(current.format('h:mm A'));
+              current.add(30, 'minutes');
+            }
+
+            arrBookedSlots.push(finalEnd.format('h:mm A'));
+          });
+
+          helperModel.getConsultantSettingData(consultant.id, (err, settingData) => {
+            const weekdayShort = bookingMoment.format('ddd').toLowerCase(); // mon, tue...
+            const timeBlock = settingData?.[`fld_${weekdayShort}_time_block`];
+
+            if (timeBlock) {
+              const timeBlocks = timeBlock.split(' - ');
+              timeBlocks.forEach(t => arrBookedSlots.push(moment(t, 'h:mm A').format('h:mm A')));
+            }
+
+            const isSlotTaken = arrBookedSlots.includes(moment(bookingSlot, 'HH:mm:ss').format('h:mm A'));
+            const isDateExcluded = settingData?.fld_days_exclusion?.split('|~|').includes(bookingDateStr);
+            const isSaturdayOff = settingData?.fld_saturday_off?.split(',').includes(String(bookindateSaturday));
+
+            if (!isSlotTaken && !isDateExcluded && !isSaturdayOff) {
+              availableConsultants.push({ id: consultant.id, name: consultant.fld_name });
+            }
+
+            processConsultant(); // move to next consultant
+          });
+        });
+      };
+
+      processConsultant();
+    });
+  });
+};
+
+const addFollower = (req, res) => {
+  const {
+    bookingid,
+    user, 
+    followerConsultantId,
+    followerConsultantName
+  } = req.body;
+
+  if (!bookingid || !followerConsultantId || !followerConsultantName || !user?.id || !user?.fld_name) {
+    return res.status(400).json({ status: false, message: "Missing required data" });
+  }
+
+  bookingModel.getBookingRowById(bookingid, (err, bookingRow) => {
+    if (err || !bookingRow) {
+      return res.status(404).json({ status: false, message: "Booking not found" });
+    }
+
+    helperModel.checkFollowerExists(bookingid, followerConsultantId, (err, exists) => {
+      if (err) {
+        return res.status(500).json({ status: false, message: "Error checking existing follower" });
+      }
+
+      if (exists) {
+        return res.status(409).json({ status: false, message: "Follower already added" });
+      }
+
+      const addedon = moment().format('YYYY-MM-DD HH:mm:ss');
+      const followerData = {
+        bookingid: bookingid,
+        follower_consultant_id: followerConsultantId,
+        consultantid: user.id, // logged-in consultant ID
+        addedon: addedon
+      };
+
+      helperModel.insertFollower(followerData, (err, insertId) => {
+        if (err || !insertId) {
+          return res.status(500).json({ status: false, message: "Failed to insert follower" });
+        }
+
+        const commentDate = moment().format('D MMM YYYY');
+        const commentTime = moment().format('h:mm a');
+        const comment = `${user.fld_admin_type} ${user.fld_name} added ${followerConsultantName} as a follower on ${commentDate} at ${commentTime}`;
+
+        const historyData = {
+          fld_booking_id: bookingid,
+          fld_comment: comment,
+          fld_notif_view_sts: 'READ',
+          fld_addedon: moment().format('YYYY-MM-DD')
+        };
+
+        bookingModel.insertBookingHistory(historyData, (err, historyId) => {
+          if (err || !historyId) {
+            return res.status(500).json({ status: false, message: "Failed to insert history" });
+          }
+
+          return res.status(200).json({
+            status: true,
+            message: "Follower added successfully",
+            followerId: insertId,
+            historyId: historyId
+          });
+        });
+      });
+    });
+  });
+};
+
+
+const updateExternalBookingInfo = (req, res) => {
+  const { bookingid, external_booking_time, external_booking_date, call_joining_link, user } = req.body;
+
+  
+  if (!user || user.fld_admin_type !== 'EXECUTIVE') {
+    return res.status(401).json({ status: false, msg: 'Unauthorized access' });
+  }
+
+  // Validate required fields
+  if (!bookingid || !external_booking_time || !external_booking_date) {
+    return res.status(400).json({ status: false, msg: 'Missing required data' });
+  }
+
+  try {
+    const formattedDate = moment(external_booking_date, ['YYYY-MM-DD', 'DD-MM-YYYY']).format('YYYY-MM-DD');
+    const formattedTime = moment(external_booking_time, 'HH:mm').format('h:mm A');
+
+    const updateData = {
+      fld_booking_date: formattedDate,
+      fld_booking_slot: formattedTime,
+      fld_call_joining_link: (call_joining_link || '').trim()
+    };
+
+    bookingModel.updateBooking(bookingid, updateData, (err1, result1) => {
+      if (err1) {
+        console.error('Error updating booking:', err1);
+        return res.status(500).json({ status: false, msg: 'Error updating booking!' });
+      }
+
+      const adminName = user.fld_name || 'Unknown Admin';
+      const commentDate = moment().format('D MMM YYYY');
+      const commentTime = moment().format('h:mm a');
+      const comment = `External Call Booking Info Updated by CRM ${adminName} on ${commentDate} at ${commentTime}`;
+
+      const historyData = {
+        fld_booking_id: bookingid,
+        fld_comment: comment,
+        fld_notif_for: 'SUBADMIN',
+        fld_addedon: moment().format('YYYY-MM-DD')
+      };
+
+      bookingModel.insertBookingHistory(historyData, (err2, historyId) => {
+        if (err2) {
+          console.error('Error inserting history:', err2);
+          return res.status(500).json({ status: false, msg: 'Error logging history!' });
+        }
+
+        return res.status(200).json({ status: true, msg: 'Booking Info. Updated Successfully' });
+      });
+    });
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return res.status(500).json({ status: false, msg: 'Something went wrong' });
+  }
+};
+
 
 
 module.exports = {
@@ -469,4 +752,9 @@ module.exports = {
   getAdmin,
   getMessageData,
   chatSubmit,
+  fetchFollowerData,
+getFollowerConsultant,
+addFollower,
+updateExternalBookingInfo,
+
 };

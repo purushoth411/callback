@@ -374,7 +374,7 @@ const insertCallRequest = (req, res) => {
           fld_email: email.trim(),
           fld_phone: phone.trim(),
           fld_verify: verifycode,
-          fld_addedon: new Date(),
+          fld_addedon: moment().format('YYYY-MM-DD') ,
         };
 
         // STEP 3: Insert User
@@ -431,7 +431,7 @@ const insertCallRequest = (req, res) => {
                   fld_que_counter: que_counter,
                   fld_question_data: question_data_string,
                   fld_answer_data: str_answer_data,
-                  fld_addedon: new Date(),
+                  fld_addedon: moment().format('YYYY-MM-DD') ,
                   fld_call_request_sts: "Consultant Assigned",
                   fld_consultant_assigned_by_admin: "Yes",
                   fld_consultant_approve_sts: "Yes",
@@ -499,7 +499,7 @@ const insertCallRequest = (req, res) => {
                         planId: client_plan_id,
                         requestMessage: requestMessage,
                         userId: crm_id,
-                        addedon: new Date(),
+                        addedon:moment().format('YYYY-MM-DD') ,
                       };
 
                       bookingModel.insertAddCallRequest(
@@ -531,7 +531,7 @@ const insertCallRequest = (req, res) => {
                         fld_call_added_by: adminId,
                         fld_consultation_sts: "Pending",
                         fld_call_request_sts: "Pending",
-                        fld_added_on: new Date(),
+                        fld_added_on: moment().format('YYYY-MM-DD') ,
                       };
 
                       bookingModel.insertExternalCall(extCallData, (err) => {
@@ -551,7 +551,7 @@ const insertCallRequest = (req, res) => {
                         fld_booking_id: bookingId,
                         fld_comment: extComment,
                         fld_notif_for: "SUBADMIN",
-                        fld_addedon: new Date(),
+                        fld_addedon: moment().format('YYYY-MM-DD') ,
                       };
 
                       bookingModel.insertBookingHistory(extHistory, (err) => {
@@ -578,7 +578,7 @@ const insertCallRequest = (req, res) => {
                         fld_comment: comment1,
                         fld_notif_for: "EXECUTIVE",
                         fld_notif_for_id: user?.fld_admin_id || adminId,
-                        fld_addedon: new Date(),
+                        fld_addedon: moment().format('YYYY-MM-DD') ,
                       };
 
                       bookingModel.insertBookingHistory(history1, (err) => {
@@ -601,7 +601,7 @@ const insertCallRequest = (req, res) => {
                         fld_comment: comment2,
                         fld_notif_for: "EXECUTIVE",
                         fld_notif_for_id: user?.fld_admin_id || adminId,
-                        fld_addedon: new Date(),
+                        fld_addedon: moment().format('YYYY-MM-DD') ,
                       };
 
                       bookingModel.insertBookingHistory(history2, (err) => {
@@ -2301,7 +2301,8 @@ const updateReassignCallStatus = (req, res) => {
             const adminType = adminInfo.fld_admin_type || "CONSULTANT";
             const currentDate = moment().format("D MMM YYYY");
             const currentTime = moment().format("h:mm A");
-            const reassignedBy = req.user?.fld_name || "Adminn";
+           const reassignedBy = user.fld_name || "Admin";
+
 
             const comment = `Call Reassigned by consultant ${reassignedBy} to consultant ${consultantName} on ${currentDate} at ${currentTime}`;
 
@@ -2340,6 +2341,175 @@ const updateReassignCallStatus = (req, res) => {
 
 
 
+const updateExternalConsultationStatus = (req, res) => {
+  const {
+    bookingid,
+    consultation_sts,
+    consultant_name,
+    externalCallComnt,
+    user
+  } = req.body;
+
+  if (!bookingid || !consultation_sts) {
+    return res.status(400).json({ status: false, message: "Missing required fields" });
+  }
+
+  bookingModel.getBookingById(bookingid, (err, bookingResults) => {
+    if (err || !bookingResults || bookingResults.length === 0) {
+    return res.status(404).json({ status: false, message: "Booking not found" });
+  }
+
+  const bookingInfo = bookingResults[0];
+
+    const bookingUpdateData = {
+      fld_consultation_sts: consultation_sts,
+      fld_comment: externalCallComnt,
+      fld_call_request_sts: consultation_sts,
+    };
+
+    bookingModel.updateBooking(bookingid, bookingUpdateData, (err) => {
+      if (err) {
+        return res.status(500).json({ status: false, message: "Failed to update booking" });
+      }
+
+      const externalCallUpdate = {
+        fld_consultation_sts: consultation_sts,
+        fld_call_request_sts: consultation_sts,
+      };
+
+      if (consultant_name) {
+        externalCallUpdate.fld_consultant_name = consultant_name;
+      }
+
+      bookingModel.updateExternalCallsStatus(bookingid, externalCallUpdate, (err) => {
+        if (err) {
+          return res.status(500).json({ status: false, message: "Failed to update external call" });
+        }
+
+        const adminName = user?.fld_name || "SubAdmin";
+        const statusLabel = consultation_sts === "Accept" ? "Accepted" : consultation_sts;
+        const currentDate = moment().format('DD MMM YYYY');
+        const currentTime = moment().format('hh:mm A');
+        const historyComment = `Call ${statusLabel} by Subadmin ${adminName} on ${currentDate} at ${currentTime}`;
+
+        // History
+        bookingModel.insertBookingHistory({
+          fld_booking_id: bookingid,
+          fld_comment: historyComment,
+          fld_addedon: moment().format('YYYY-MM-DD')
+        }, () => {});
+
+        bookingModel.insertBookingStatusHistory({
+          fld_booking_id: bookingid,
+          status: consultation_sts,
+          fld_comment: externalCallComnt,
+          fld_call_completed_date: moment().format('YYYY-MM-DD'),
+        }, () => {});
+
+        // If accepted, send OTP email
+        if (consultation_sts === "Accept" && bookingInfo.user_email) {
+          const otpCode = bookingInfo.fld_verify_otp_url || Math.floor(100000 + Math.random() * 900000).toString();
+          const bookingCode = bookingInfo.fld_bookingcode || "";
+          const otpUrl = `${process.env.BASE_URL}/otp/${bookingid}/${otpCode}`;
+          const subject = `Booking Information ${bookingCode} - ${process.env.WEBNAME}`;
+          const body = `
+            Hi ${bookingInfo.user_name}, <br/><br/>
+            Your call is scheduled with one of the experts to discuss your research work. <br/>
+            Please click on the button below to view the booking details:<br/><br/>
+            <a href="${otpUrl}" style="color: #fff;background-color: #fa713b;border-radius:5px;padding:10px 15px;" target="_blank">View Booking Details</a><br><br>
+            Thanks & Regards,<br />
+            Team - ${process.env.WEBNAME}
+          `;
+
+          // Save OTP to booking
+          bookingModel.updateBooking(bookingid, {
+            fld_call_confirmation_status: "Call Confirmation Pending at Client End",
+            fld_verify_otp_url: otpCode,
+          }, () => {
+            // Send email
+            sendPostmarkMail({
+              from: process.env.FROM_EMAIL,
+              to: bookingInfo.user_email,
+              subject,
+              body,
+            }, (err, result) => {
+              if (result?.messageid) {
+                bookingModel.updateBooking(bookingid, {
+                  fld_message_id: result.messageid,
+                }, () => {});
+              }
+
+              // Final response
+              return res.status(200).json({ status: true, message: "Call status updated and OTP sent." });
+            });
+          });
+        } else {
+          return res.status(200).json({ status: true, message: "Call status updated." });
+        }
+      });
+    });
+  });
+};
+
+const submitCallCompletionComment = (req, res) => {
+  try {
+    const {
+      bookingid,
+      call_complete_comment,
+      call_complete_rating,
+      call_complete_recording,
+      user
+    } = req.body;
+
+    if (!bookingid || !call_complete_comment || !call_complete_rating) {
+      return res.status(400).json({ status: false, message: 'All fields are required' });
+    }
+
+    const updateData = {
+      fld_call_complete_comment: call_complete_comment,
+      fld_call_complete_rating: call_complete_rating,
+      fld_call_complete_recording: call_complete_recording,
+      callRecordingSts: 'Call Recording Updated',
+    };
+
+    const now = moment();
+    const formattedDate = now.format('DD-MMM-YYYY');
+    const formattedTime = now.format('hh:mm A');
+
+    const adminName = user?.fld_name|| "Admin";
+    const comment = `Call recording uploaded by ${adminName} on ${formattedDate} at ${formattedTime}`;
+
+    bookingModel.updateBooking(bookingid, updateData, (err, updated) => {
+      if (err || !updated) {
+        console.error("Error updating booking:", err);
+        return res.status(500).json({ status: false, message: 'Failed to update booking' });
+      }
+
+      bookingModel.insertBookingHistory({
+        fld_booking_id: bookingid,
+        fld_comment: comment,
+        fld_notif_for: 'CONSULTANT',
+        fld_notif_for_id: 1,
+        fld_addedon: now.format('YYYY-MM-DD')
+      }, (err, historyId) => {
+        if (err || !historyId) {
+          console.error("Error inserting booking history:", err);
+          return res.status(500).json({ status: false, message: 'Failed to insert history' });
+        }
+
+        return res.json({ status: true, message: 'Call comment submitted successfully' });
+      });
+    });
+
+  } catch (error) {
+    console.error('Error in callCompletionComment:', error);
+    res.status(500).json({ status: false, message: 'Internal Server Error' });
+  }
+};
+
+
+
+
 module.exports = {
   fetchBookings,
   getBookingHistory,
@@ -2371,4 +2541,6 @@ module.exports = {
   assignExternalCall,
   checkCompletedCall,
   updateReassignCallStatus,
+  updateExternalConsultationStatus,
+  submitCallCompletionComment,
 };

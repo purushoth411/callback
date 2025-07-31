@@ -166,6 +166,36 @@ const getAllActiveConsultants = (callback) => {
   });
 };
 
+const getAllActiveBothConsultants = (callback) => {
+  const query = `
+    SELECT id, fld_name, fld_email, fld_phone, fld_username, fld_permission
+    FROM tbl_admin 
+    WHERE status = 'Active'
+      AND attendance = 'PRESENT'
+      AND (
+        fld_admin_type = 'CONSULTANT' 
+        OR fld_admin_type = 'SUBADMIN'
+      )
+  `;
+
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("DB connection error:", err);
+      return callback(err, null);
+    }
+
+    connection.query(query, (error, results) => {
+      connection.release();
+      if (error) {
+        console.error("Query error (consultants):", error);
+        return callback(error, null);
+      }
+      return callback(null, results);
+    });
+  });
+};
+
+
 const getAdmin = (type, status, callback) => {
   let query = `
     SELECT * FROM tbl_admin
@@ -598,6 +628,82 @@ const insertChatMessage = (data, callback) => {
   }
 };
 
+const getFollowerData = (filters, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("Connection error:", err);
+      return callback(err);
+    }
+
+    let query = "SELECT * FROM tbl_follower WHERE 1=1";
+    const params = [];
+
+    if (filters.id) {
+      query += " AND id = ?";
+      params.push(filters.id);
+    }
+    if (filters.follower_consultant_id) {
+      query += " AND follower_consultant_id = ?";
+      params.push(filters.follower_consultant_id);
+    }
+    if (filters.bookingid) {
+      query += " AND bookingid = ?";
+      params.push(filters.bookingid);
+    }
+    if (filters.consultantid) {
+      query += " AND consultantid = ?";
+      params.push(filters.consultantid);
+    }
+    if (filters.status) {
+      query += " AND status = ?";
+      params.push(filters.status);
+    }
+
+    connection.query(query, params, (err, results) => {
+      connection.release();
+
+      if (err) {
+        return callback(err);
+      }
+
+      
+      if (filters.id) {
+        return callback(null, results[0] || null);
+      } else {
+        return callback(null, results);
+      }
+    });
+  });
+};
+
+const checkFollowerExists = (bookingId, followerId, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+    const sql = `SELECT id FROM tbl_follower WHERE bookingid = ? AND follower_consultant_id = ?`;
+    connection.query(sql, [bookingId, followerId], (err, results) => {
+      connection.release();
+      if (err) return callback(err);
+      callback(null, results.length > 0);
+    });
+  });
+};
+
+const insertFollower = (data, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+    const sql = `
+      INSERT INTO tbl_follower (bookingid, follower_consultant_id, consultantid, addedon)
+      VALUES (?, ?, ?, ?)
+    `;
+    const values = [data.bookingid, data.follower_consultant_id, data.consultantid, data.addedon];
+    connection.query(sql, values, (err, result) => {
+      connection.release();
+      if (err) return callback(err);
+      callback(null, result.insertId);
+    });
+  });
+};
+
 module.exports = {
   getAllTeams,
   getAllActiveTeams,
@@ -620,4 +726,8 @@ module.exports = {
   getMessagesByBookingId,
   getMessageCount,
   insertChatMessage,
+  getFollowerData,
+  getAllActiveBothConsultants,
+  insertFollower,
+  checkFollowerExists,
 };
