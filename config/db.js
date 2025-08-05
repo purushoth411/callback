@@ -1,13 +1,13 @@
 var mysql = require('mysql');
 
 var connection = mysql.createPool({
-    connectionLimit: 100,
+    connectionLimit: 200,
     host: '50.87.148.156',
     user: 'rapidcol_call_ca',
     password: 'nv0@Fg)^ZcvW',
     database: 'rapidcol_call_calendar_test',
     charset: 'utf8mb4',
-    connectTimeout: 20000, 
+    connectTimeout: 30000, 
     timezone: 'Asia/Kolkata',
 });
 
