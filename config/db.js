@@ -7,7 +7,7 @@ var connection = mysql.createPool({
     password: 'nv0@Fg)^ZcvW',
     database: 'rapidcol_call_calendar_test',
     charset: 'utf8mb4',
-    connectTimeout: 20000, 
+    connectTimeout: 30000, 
     timezone: 'Asia/Kolkata',
 });
 
