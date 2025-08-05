@@ -28,6 +28,7 @@ router.post("/checkPresalesCall", bookingController.checkPresalesCall);
 router.post("/addBooking", bookingController.insertCallRequest);
 router.post('/checkPostsaleCompletedCalls', bookingController.checkPostsaleCompletedCalls);
 router.post('/saveCallScheduling', bookingController.saveCallScheduling);
+router.post('/updateCallScheduling', bookingController.updateCallScheduling);
 router.post("/fetchBookingById", bookingController.fetchBookingById);
 router.post("/deleteBookingById", bookingController.deleteBookingById);
 router.post("/setAsConverted", bookingController.setAsConverted);

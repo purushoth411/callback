@@ -816,6 +816,129 @@ const saveCallScheduling = (req, res) => {
   });
 };
 
+const updateCallScheduling = (req, res) => {
+  const {
+    bookingId,
+    consultantId,
+    bookingDate,
+    slot,
+    timezone,
+    callLink,
+    secondaryConsultantId,
+  } = req.body;
+
+  if (!bookingId || !consultantId || !bookingDate || !slot) {
+    return res.json({ status: false, message: "Missing required data." });
+  }
+
+  // Step 1: Fetch existing booking row
+  bookingModel.getBookingRowById(bookingId, (err, oldBookingRow) => {
+    if (err || !oldBookingRow) {
+      return res.json({
+        status: false,
+        message: "Failed to fetch existing booking data.",
+      });
+    }
+
+    const booking_date = moment(bookingDate).format("YYYY-MM-DD");
+    const booking_slot = slot;
+    const slcttimezone = timezone;
+    const call_joining_link = callLink;
+
+    const bookingData = {
+      fld_booking_date: booking_date,
+      fld_booking_slot: booking_slot,
+      fld_booking_date_old: oldBookingRow.fld_booking_date,
+      fld_booking_slot_old: oldBookingRow.fld_booking_slot,
+      fld_timezone: slcttimezone,
+      fld_call_joining_link: call_joining_link,
+      fld_call_request_sts: "Call Rescheduled",
+      fld_consultation_sts: "Pending",
+      fld_call_confirmation_status: "",
+      fld_addedon: moment().format("YYYY-MM-DD HH:mm:ss"),
+    };
+
+    // Step 2: Update booking
+    bookingModel.updateBooking(bookingId, bookingData, (err) => {
+      if (err)
+        return res.json({ status: false, message: "Failed to update booking." });
+
+      // Step 3: Get consultant info
+      helperModel.getAdminById(consultantId, (err, admin) => {
+        if (err || !admin)
+          return res.json({ status: false, message: "Consultant not found." });
+
+        const comment = `Call Rescheduled by ${admin.fld_name} on ${moment().format(
+          "DD MMM YYYY"
+        )} at ${moment().format("hh:mm a")}`;
+
+        const historyData = {
+          fld_booking_id: bookingId,
+          fld_comment: comment,
+          fld_notif_for: admin.fld_admin_type,
+          fld_notif_for_id: consultantId,
+          fld_addedon: moment().format("YYYY-MM-DD"),
+        };
+
+        // Step 4: Insert primary consultant history
+        bookingModel.insertBookingHistory(historyData, (err) => {
+          if (err)
+            return res.json({
+              status: false,
+              message: "Failed to insert history log.",
+            });
+
+          // Step 5: If secondary consultant exists
+          if (secondaryConsultantId) {
+            helperModel.getAdminById(secondaryConsultantId, (err, secAdmin) => {
+              if (err || !secAdmin) {
+                return res.json({
+                  status: true,
+                  message:
+                    "Call Rescheduled, but failed to load secondary consultant.",
+                });
+              }
+
+              const secComment = `Call Rescheduled by ${admin.fld_name} for secondary consultant on ${moment().format(
+                "DD MMM YYYY"
+              )} at ${moment().format("hh:mm a")}`;
+
+              const secHistory = {
+                fld_booking_id: bookingId,
+                fld_comment: secComment,
+                fld_notif_for: secAdmin.fld_admin_type,
+                fld_notif_for_id: consultantId,
+                fld_addedon: moment().format("YYYY-MM-DD"),
+              };
+
+              bookingModel.insertBookingHistory(secHistory, (err) => {
+                if (err) {
+                  return res.json({
+                    status: true,
+                    message:
+                      "Call Rescheduled, but failed to log secondary consultant history.",
+                  });
+                }
+
+                return res.json({
+                  status: true,
+                  message: "Call Rescheduled successfully.",
+                });
+              });
+            });
+          } else {
+            return res.json({
+              status: true,
+              message: "Call Rescheduled successfully.",
+            });
+          }
+        });
+      });
+    });
+  });
+};
+
+
 const fetchBookingById = (req, res) => {
   try {
     const { bookingId } = req.body;
@@ -2523,6 +2646,7 @@ module.exports = {
   insertCallRequest,
   checkPostsaleCompletedCalls,
   saveCallScheduling,
+  updateCallScheduling,
   fetchBookingById,
   deleteBookingById,
   setAsConverted,
