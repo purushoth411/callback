@@ -255,12 +255,14 @@ const getBookingDetailsWithRc = (id, callback) => {
   db.getConnection((err, connection) => {
     if (err) return callback(err);
 
-    let sql = `
-      SELECT b.*, r.slot_time AS rc_slot_time, r.booking_date AS rc_booking_date
-      FROM tbl_booking b
-      LEFT JOIN tbl_rc_call_booking_request r ON r.id = b.fld_call_request_id
-      WHERE b.callDisabled IS NULL
-    `;
+  let sql = `
+  SELECT b.*, r.slot_time AS rc_slot_time, r.booking_date AS rc_booking_date, a.fld_name AS consultant_name
+  FROM tbl_booking b
+  LEFT JOIN tbl_rc_call_booking_request r ON r.id = b.fld_call_request_id
+  LEFT JOIN tbl_admin a ON a.id = b.fld_consultantid
+  WHERE b.callDisabled IS NULL
+`;
+
 
     const values = [];
 
