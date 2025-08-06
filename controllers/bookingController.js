@@ -816,6 +816,8 @@ const saveCallScheduling = (req, res) => {
   });
 };
 
+
+
 const updateCallScheduling = (req, res) => {
   const {
     bookingId,
@@ -831,19 +833,22 @@ const updateCallScheduling = (req, res) => {
     return res.json({ status: false, message: "Missing required data." });
   }
 
-  // Step 1: Fetch existing booking row
-  bookingModel.getBookingRowById(bookingId, (err, oldBookingRow) => {
-    if (err || !oldBookingRow) {
+bookingModel.getBookingById(bookingId, (err, bookingRows) => {
+    if (err || !bookingRows || bookingRows.length === 0) {
       return res.json({
         status: false,
         message: "Failed to fetch existing booking data.",
       });
     }
 
+    const oldBookingRow = bookingRows[0];
+
     const booking_date = moment(bookingDate).format("YYYY-MM-DD");
     const booking_slot = slot;
     const slcttimezone = timezone;
     const call_joining_link = callLink;
+    const call_request_id = oldBookingRow.fld_call_request_id;
+    const rc_call_request_id = oldBookingRow.fld_rc_call_request_id;
 
     const bookingData = {
       fld_booking_date: booking_date,
@@ -858,19 +863,29 @@ const updateCallScheduling = (req, res) => {
       fld_addedon: moment().format("YYYY-MM-DD HH:mm:ss"),
     };
 
-    // Step 2: Update booking
     bookingModel.updateBooking(bookingId, bookingData, (err) => {
-      if (err)
+      if (err) {
         return res.json({ status: false, message: "Failed to update booking." });
+      }
 
-      // Step 3: Get consultant info
+      if (call_request_id && rc_call_request_id) {
+        bookingModel.updateRcCallRequestSts(
+          call_request_id,
+          rc_call_request_id,
+          "Call Rescheduled",
+          () => {}
+        );
+      }
+
       helperModel.getAdminById(consultantId, (err, admin) => {
-        if (err || !admin)
+        if (err || !admin) {
           return res.json({ status: false, message: "Consultant not found." });
+        }
 
-        const comment = `Call Rescheduled by ${admin.fld_name} on ${moment().format(
-          "DD MMM YYYY"
-        )} at ${moment().format("hh:mm a")}`;
+        const oldDateTimeFormatted = moment(oldBookingRow.fld_booking_date + ' ' + oldBookingRow.fld_booking_slot, "YYYY-MM-DD hh:mm A").format("ddd DD MMM, YYYY hh:mm A");
+        const newDateTimeFormatted = moment(bookingDate + ' ' + slot, "YYYY-MM-DD hh:mm A").format("ddd DD MMM, YYYY hh:mm A");
+
+        const comment = `Call Rescheduled from ${oldDateTimeFormatted} to ${newDateTimeFormatted} by ${admin.fld_name} on ${moment().format("YYYY-MM-DD")} at ${moment().format("hh:mm A")}`;
 
         const historyData = {
           fld_booking_id: bookingId,
@@ -880,28 +895,56 @@ const updateCallScheduling = (req, res) => {
           fld_addedon: moment().format("YYYY-MM-DD"),
         };
 
-        // Step 4: Insert primary consultant history
         bookingModel.insertBookingHistory(historyData, (err) => {
-          if (err)
-            return res.json({
-              status: false,
-              message: "Failed to insert history log.",
-            });
+          if (err) {
+            return res.json({ status: false, message: "Failed to insert history log." });
+          }
 
-          // Step 5: If secondary consultant exists
+          const handleFinalResponse = () => {
+            // Merge booking data for email
+            const fullBooking = {
+              ...oldBookingRow,
+              ...bookingData,
+              fld_email: oldBookingRow.fld_email,
+              user_name: oldBookingRow.user_name,
+              user_email: oldBookingRow.user_email,
+              fld_sale_type: oldBookingRow.fld_sale_type,
+              fld_topic_of_research: oldBookingRow.fld_topic_of_research,
+              fld_call_regarding: oldBookingRow.fld_call_regarding,
+              fld_call_joining_link: bookingData.fld_call_joining_link,
+              fld_timezone: bookingData.fld_timezone,
+              fld_call_confirmation_status: oldBookingRow.fld_call_confirmation_status,
+              fld_verify_otp_url: oldBookingRow.fld_verify_otp_url,
+              id: bookingId,
+              admin_name: admin.fld_name,
+              admin_email: admin.fld_email,
+            };
+
+            sendRescheduleMail({
+              booking: fullBooking,
+              oldDateTime: `${oldBookingRow.fld_booking_date} ${oldBookingRow.fld_booking_slot}`,
+              newDateTime: `${bookingDate} ${slot}`,
+            }, (err) => {
+              if (err) {
+                console.error(" Email sending failed:", err);
+              } else {
+                console.log("Reschedule email sent successfully");
+              }
+
+              return res.json({
+                status: true,
+                message: "Call Rescheduled successfully.",
+              });
+            });
+          };
+
           if (secondaryConsultantId) {
             helperModel.getAdminById(secondaryConsultantId, (err, secAdmin) => {
               if (err || !secAdmin) {
-                return res.json({
-                  status: true,
-                  message:
-                    "Call Rescheduled, but failed to load secondary consultant.",
-                });
+                return handleFinalResponse(); // Still send main email
               }
 
-              const secComment = `Call Rescheduled by ${admin.fld_name} for secondary consultant on ${moment().format(
-                "DD MMM YYYY"
-              )} at ${moment().format("hh:mm a")}`;
+              const secComment = `Call Rescheduled by ${admin.fld_name} for secondary consultant on ${moment().format("DD MMM YYYY")} at ${moment().format("hh:mm a")}`;
 
               const secHistory = {
                 fld_booking_id: bookingId,
@@ -913,30 +956,109 @@ const updateCallScheduling = (req, res) => {
 
               bookingModel.insertBookingHistory(secHistory, (err) => {
                 if (err) {
-                  return res.json({
-                    status: true,
-                    message:
-                      "Call Rescheduled, but failed to log secondary consultant history.",
-                  });
+                  console.warn(" Failed to insert secondary consultant history.");
                 }
-
-                return res.json({
-                  status: true,
-                  message: "Call Rescheduled successfully.",
-                });
+                handleFinalResponse(); // Send mail regardless
               });
             });
           } else {
-            return res.json({
-              status: true,
-              message: "Call Rescheduled successfully.",
-            });
+            handleFinalResponse();
           }
         });
       });
     });
   });
 };
+
+
+function sendRescheduleMail({ booking, oldDateTime, newDateTime }, callback) {
+  const clientName = booking.user_name || "Client";
+  const consultantName = booking.admin_name || "Consultant";
+  const oldDate = moment(oldDateTime, 'YYYY-MM-DD h:mm A');
+
+  const newDate = moment(newDateTime, 'YYYY-MM-DD h:mm A');
+
+
+  const calendarLink = `http://www.google.com/calendar/event?action=TEMPLATE&text=${encodeURIComponent(clientName)} : ${process.env.WEBNAME} Demo&dates=${newDate.format("YYYYMMDD")}T${newDate.format("HHmm")}00/${newDate.format("YYYYMMDD")}&location=New Delhi, India&trp=false&details=${encodeURIComponent(`${clientName} : ${process.env.WEBNAME} Demo\n\nWhen: ${newDate.format("ddd MMM DD, YYYY hh:mm A")}`)}`;
+
+  const subject = `Booking Rescheduled - ${process.env.WEBNAME}`;
+  const from = process.env.FROM_EMAIL || "donotreply@rapidcollaborate.com";
+  const to = booking.fld_email;
+  const bcc = booking.admin_email;
+
+  const body = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+</head>
+<body style="font-family: Arial, sans-serif;">
+  <table style="border: 1px solid #e5e5e5; width: 100%;">
+    <tr>
+      <td style="background: #f6f6f6; padding: 20px; width: 20%;">
+        <table style="text-align: center;">
+          <tr><td style="font-weight: bold;">${newDate.format("MMM")}</td></tr>
+          <tr><td style="font-size: 24px; font-weight: bold;">${newDate.format("DD")}</td></tr>
+          <tr><td>${newDate.format("ddd")}</td></tr>
+        </table>
+      </td>
+      <td style="padding: 20px; width: 40%;">
+        <div style="font-weight: 600; font-size: 16px;">${booking.fld_call_regarding}</div>
+        <p>
+          <strong>When:</strong> <s>${oldDate.format("ddd MMM DD, YYYY hh:mm A")}</s><br/>
+          <strong>Updated:</strong> ${newDate.format("ddd MMM DD, YYYY hh:mm A")}<br/>
+          <strong>Timezone:</strong> ${booking.fld_timezone}
+        </p>
+        <p><strong>Consultant:</strong> ${consultantName}</p>
+      </td>
+      <td style="padding: 20px; width: 40%;">
+        <div style="font-weight: 600;">Agenda</div>
+        <p>
+          <s>${oldDate.format("ddd MMM DD, YYYY hh:mm A")}</s><br/>
+          Updated: ${newDate.format("ddd MMM DD, YYYY hh:mm A")}
+        </p>
+        <p>${booking.fld_call_regarding}</p>
+        <p><a href="${calendarLink}" target="_blank">Add to Calendar >></a></p>
+      </td>
+    </tr>
+  </table>
+
+  <table style="border: 1px solid #e5e5e5; width: 100%; margin-top: 10px;">
+    <tr>
+      <td style="padding: 20px;"><strong>Name</strong><br/>${booking.user_name}</td>
+      <td style="padding: 20px;"><strong>Email</strong><br/>${booking.user_email}</td>
+      <td style="padding: 20px;"><strong>Sale Type</strong><br/>${booking.fld_sale_type}</td>
+    </tr>
+    <tr>
+      <td style="padding: 20px;"><strong>Topic Of Research</strong><br/>${booking.fld_topic_of_research}</td>
+      <td style="padding: 20px;"><strong>Call Regarding</strong><br/>${booking.fld_call_regarding}</td>
+      <td style="padding: 20px;"><strong>Call Joining Link</strong><br/>${booking.fld_call_joining_link}</td>
+    </tr>
+    ${booking.fld_call_confirmation_status === "Call Confirmation Pending at Client End" ? `
+      <tr>
+        <td style="padding: 20px;">
+          <a href="${process.env.BASE_URL}/otp/${booking.id}/${booking.fld_verify_otp_url}" style="background-color: #fa713b; color: #fff; padding: 10px 15px; border-radius: 5px; text-decoration: none;" target="_blank">View Booking Details</a>
+        </td>
+      </tr>` : ""
+    }
+  </table>
+
+  <p style="margin-top: 20px;">
+    Thanks and regards,<br/>
+    Team - ${process.env.WEBNAME}
+  </p>
+</body>
+</html>`;
+
+  sendPostmarkMail({
+    from: from,
+    to: to,
+    bcc: bcc || "",
+    subject: subject,
+    body: body
+  }, callback);
+}
+
 
 
 const fetchBookingById = (req, res) => {
@@ -1063,7 +1185,7 @@ const setAsConverted = (req, res) => {
 };
 
 const updateStatusByCrm = (req, res) => {
-  const { bookingid, statusByCrm } = req.body;
+  const { bookingid, statusByCrm,user} = req.body;
 
   if (!bookingid || !statusByCrm) {
     return res
@@ -1105,7 +1227,7 @@ const updateStatusByCrm = (req, res) => {
 
       const currentDate = moment().format("D MMM YYYY");
       const currentTime = moment().format("hh:mm a");
-      const adminName = "Admin";
+      const adminName = user?.fld_name;
       const comment = `Call ${strmsg} by ${adminName} on ${currentDate} at ${currentTime}`;
 
       bookingModel.getAllCrmIds((err, crmids) => {

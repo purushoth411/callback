@@ -22,7 +22,7 @@ function sendPostmarkMail({ from, to, subject, body, bcc = "" }, callback) {
   };
 
   if (bcc) {
-    emailData.Bcc = bcc;
+    emailData.Bcc = "web@thesisindia.net";
   }
 
   client.sendEmail(emailData, (error, result) => {
