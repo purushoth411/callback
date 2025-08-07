@@ -729,7 +729,42 @@ const updateExternalBookingInfo = (req, res) => {
   }
 };
 
+const getNotifications= (req, res) => {
+  try {
+    const user = req.body;
+    if (!user || !user.id || !user.fld_admin_type) {
+      return res.status(400).json({
+        status: false,
+        message: 'User ID and admin type are required',
+      });
+    }
 
+    helperModel.getNotifications(user, (err, results) => {
+      if (err) {
+        console.error('DB error:', err);
+        return res.status(500).json({
+          status: false,
+          message: 'Failed to fetch notifications',
+          error: err.message || err,
+        });
+      }
+
+      return res.json({
+        status: true,
+        message: 'Notifications fetched successfully',
+        data: results,
+      });
+    });
+  } catch (error) {
+    // This catches synchronous errors in controller code itself
+    console.error('Controller error:', error);
+    return res.status(500).json({
+      status: false,
+      message: 'Internal server error',
+      error: error.message || error,
+    });
+  }
+};
 
 module.exports = {
   getAllActiveTeams,
@@ -756,5 +791,6 @@ module.exports = {
 getFollowerConsultant,
 addFollower,
 updateExternalBookingInfo,
+getNotifications,
 
 };

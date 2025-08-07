@@ -706,6 +706,44 @@ const insertFollower = (data, callback) => {
   });
 };
 
+ const getNotifications = (user, callback) => {
+      
+let sql;
+let params = [];
+      if (user.fld_admin_type.toUpperCase() === 'SUPERADMIN') {
+        sql = `
+          SELECT id, fld_bookingid, fld_sender_id, fld_receiver_id, fld_message, fld_postedby, fld_view_status,
+                 fld_read_status, fld_read_time, fld_addedon
+          FROM tbl_booking_chat
+          WHERE  fld_read_status = 'UNREAD'
+          ORDER BY fld_addedon DESC
+          
+          LIMIT 50
+        `;
+      } else {
+        sql = `
+          SELECT id, fld_bookingid, fld_sender_id, fld_receiver_id, fld_message, fld_postedby, fld_view_status,
+                 fld_read_status, fld_read_time, fld_addedon
+          FROM tbl_booking_chat
+          WHERE fld_receiver_id = ? AND fld_read_status = 'UNREAD'
+          ORDER BY fld_addedon DESC
+          LIMIT 50
+        `;
+        params = [user.id];
+      }
+
+      db.getConnection((err, connection) => {
+        if (err) return callback(err);
+
+        connection.query(sql, params, (queryErr, results) => {
+          connection.release();
+          if (queryErr) return callback(queryErr);
+
+          callback(null, results);
+        });
+      });
+    };
+
 module.exports = {
   getAllTeams,
   getAllActiveTeams,
@@ -732,4 +770,5 @@ module.exports = {
   getAllActiveBothConsultants,
   insertFollower,
   checkFollowerExists,
+  getNotifications
 };

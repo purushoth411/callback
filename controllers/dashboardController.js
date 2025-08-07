@@ -155,11 +155,65 @@ const saveConsultantSettings = (req, res) => {
   });
 };
 
+const dayFieldMap = {
+  sun: 'fld_sun_time_block',
+  mon: 'fld_mon_time_block',
+  tue: 'fld_tue_time_block',
+  wed: 'fld_wed_time_block',
+  thu: 'fld_thu_time_block',
+  fri: 'fld_fri_time_block',
+  sat: 'fld_sat_time_block',
+};
+
+const updateBlockSlots = (req, res) => {
+  const { consultantid, day, blockedSlots } = req.body;
+
+  if (!consultantid || !day || typeof blockedSlots !== 'string') {
+    return res.status(400).json({
+      status: false,
+      message: 'Missing required fields: consultantid, day, or blockedSlots',
+    });
+  }
+
+  const dayKey = day.toLowerCase(); 
+
+  if (!dayFieldMap[dayKey]) {
+    return res.status(400).json({
+      status: false,
+      message: 'Invalid day value. Must be one of sun, mon, tue, wed, thu, fri, sat',
+    });
+  }
+
+
+  const dataToUpdate = {
+    [dayFieldMap[dayKey]]: blockedSlots,
+    fld_updatedon: new Date(),
+  };
+
+  dashboardModel.updateConsultantSettings(consultantid, dataToUpdate, (err, result) => {
+    if (err) {
+      console.error('DB update error:', err);
+      return res.status(500).json({
+        status: false,
+        message: 'Database error while updating blocked slots',
+        error: err.message || err,
+      });
+    }
+
+    
+    return res.json({
+      status: true,
+      message: 'Blocked slots updated successfully',
+      data: result,
+    });
+  });
+};
 
 module.exports = {
     getAllActiveTeams,
     getCallStatistics,
     getParticularStatusCallsOfCrm,
     getConsultantSettingData,
-    saveConsultantSettings
+    saveConsultantSettings,
+    updateBlockSlots,
 }
