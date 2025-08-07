@@ -32,12 +32,20 @@ const getBookings = (userId, userType, assigned_team, filters, dashboard_status,
   const params = [];
 
   const buildFilters = () => {
+    // if (Array.isArray(filters.consultationStatus) && filters.consultationStatus.length > 0) {
+    //   const placeholders = filters.consultationStatus.map(() => "?").join(",");
+    //   sql += ` AND b.fld_consultation_sts IN (${placeholders})`;
+    //   params.push(...filters.consultationStatus);
+    // } else if (filters.consultationStatus) {
+    //   sql += ` AND b.fld_consultation_sts = ?`;
+    //   params.push(filters.consultationStatus);
+    // }
     if (Array.isArray(filters.consultationStatus) && filters.consultationStatus.length > 0) {
       const placeholders = filters.consultationStatus.map(() => "?").join(",");
-      sql += ` AND b.fld_consultation_sts IN (${placeholders})`;
+      sql += ` AND b.fld_call_request_sts IN (${placeholders})`;
       params.push(...filters.consultationStatus);
     } else if (filters.consultationStatus) {
-      sql += ` AND b.fld_consultation_sts = ?`;
+      sql += ` AND b.fld_call_request_sts = ?`;
       params.push(filters.consultationStatus);
     }
 
@@ -1581,7 +1589,353 @@ const checkConflictingBookings = (consultantId, bookingDate, bookingslot, slotVa
   });
 };
 
+const fetchSummaryBookings = (userId, userType, assignedTeam, filters, type, page = 1, callback) => {
+  const currentDate = moment().format('YYYY-MM-DD');
+  const nextDay = moment().add(1, 'day').format('YYYY-MM-DD');
+  const yesterday = moment().subtract(1, 'day').format('YYYY-MM-DD');
 
+ 
+  const limit = 50;
+  const offset = (page - 1) * limit;
+
+  let sql = `
+    SELECT 
+      b.*,
+      admin.fld_client_code AS admin_code,
+      admin.fld_name AS admin_name,
+      admin.fld_email AS admin_email,
+      admin.fld_profile_image AS profile_image,
+      admin.fld_client_code AS consultant_code,
+      user.fld_user_code AS user_code,
+      user.fld_name AS user_name,
+      user.fld_email AS user_email,
+      user.fld_decrypt_password AS user_pass,
+      user.fld_country_code AS user_country_code,
+      user.fld_phone AS user_phone,
+      user.fld_address,
+      user.fld_city,
+      user.fld_pincode,
+      user.fld_country,
+      addedby.id AS crm_id,
+      addedby.fld_name AS crm_name
+    FROM tbl_booking b
+    LEFT JOIN tbl_admin admin ON b.fld_consultantid = admin.id
+    LEFT JOIN tbl_admin addedby ON b.fld_addedby = addedby.id
+    INNER JOIN tbl_user user ON b.fld_userid = user.id
+    WHERE b.callDisabled IS NULL
+  `;
+
+  // Count query for pagination
+  let countSql = `
+    SELECT COUNT(*) as total
+    FROM tbl_booking b
+    LEFT JOIN tbl_admin admin ON b.fld_consultantid = admin.id
+    LEFT JOIN tbl_admin addedby ON b.fld_addedby = addedby.id
+    INNER JOIN tbl_user user ON b.fld_userid = user.id
+    WHERE b.callDisabled IS NULL
+  `;
+
+  const params = [];
+  const countParams = [];
+
+  const buildFilters = () => {
+    // Consultation status filtering
+    if (filters.consultationStatus && Array.isArray(filters.consultationStatus)) {
+      if (filters.consultationStatus.includes('Converted')) {
+        const condition = ` AND b.fld_converted_sts = ?`;
+        sql += condition;
+        countSql += condition;
+        params.push('Yes');
+        countParams.push('Yes');
+      } else {
+        const statusConditions = filters.consultationStatus.map(() => 
+          "FIND_IN_SET(?, b.fld_call_request_sts)"
+        ).join(' OR ');
+        const condition = ` AND (${statusConditions})`;
+        sql += condition;
+        countSql += condition;
+        params.push(...filters.consultationStatus);
+        countParams.push(...filters.consultationStatus);
+      }
+    } else if (filters.consultationStatus) {
+      if (filters.consultationStatus === 'Converted') {
+        const condition = ` AND b.fld_converted_sts = ?`;
+        sql += condition;
+        countSql += condition;
+        params.push('Yes');
+        countParams.push('Yes');
+      } else {
+        const condition = ` AND FIND_IN_SET(?, b.fld_call_request_sts)`;
+        sql += condition;
+        countSql += condition;
+        params.push(filters.consultationStatus);
+        countParams.push(filters.consultationStatus);
+      }
+    }
+
+    // Sale type filtering
+    if (filters.sale_type && Array.isArray(filters.sale_type)) {
+      const saleConditions = filters.sale_type.map(() => 
+        "FIND_IN_SET(?, b.fld_sale_type)"
+      ).join(' OR ');
+      const condition = ` AND (${saleConditions})`;
+      sql += condition;
+      countSql += condition;
+      params.push(...filters.sale_type);
+      countParams.push(...filters.sale_type);
+    } else if (filters.sale_type) {
+      const condition = ` AND FIND_IN_SET(?, b.fld_sale_type)`;
+      sql += condition;
+      countSql += condition;
+      params.push(filters.sale_type);
+      countParams.push(filters.sale_type);
+    }
+
+    // Call request status filtering
+    if (filters.callRequestStatus) {
+      if (filters.callRequestStatus === "Accept" && filters.callConfirmationStatus) {
+        const condition = ` AND b.fld_call_request_sts = ? AND b.fld_call_confirmation_status = ?`;
+        sql += condition;
+        countSql += condition;
+        params.push(filters.callRequestStatus, filters.callConfirmationStatus);
+        countParams.push(filters.callRequestStatus, filters.callConfirmationStatus);
+      } else {
+        const condition = ` AND b.fld_call_request_sts = ?`;
+        sql += condition;
+        countSql += condition;
+        params.push(filters.callRequestStatus);
+        countParams.push(filters.callRequestStatus);
+      }
+    }
+
+    // Basic filters
+    const basicFilters = [
+      { key: 'executiveId', field: 'b.fld_addedby' },
+      { key: 'bookingId', field: 'b.id' },
+      { key: 'consultantId', field: 'b.fld_consultantid' },
+      { key: 'secondaryConsultantId', field: 'b.fld_secondary_consultant_id' },
+      { key: 'userId', field: 'b.fld_userid' },
+      { key: 'status', field: 'b.status' },
+      { key: 'externalAssign', field: 'b.fld_call_external_assign' },
+      { key: 'crmId', field: 'b.fld_addedby' },
+      { key: 'particularStatus', field: 'b.fld_call_request_sts' },
+      { key: 'recordingStatus', field: 'b.fld_recording_status' }
+    ];
+
+    basicFilters.forEach(filter => {
+      if (filters[filter.key]) {
+        const condition = ` AND ${filter.field} = ?`;
+        sql += condition;
+        countSql += condition;
+        params.push(filters[filter.key]);
+        countParams.push(filters[filter.key]);
+      }
+    });
+
+    // Team ID filtering
+    if (filters.teamId) {
+      const condition = ` AND FIND_IN_SET(?, b.fld_teamid)`;
+      sql += condition;
+      countSql += condition;
+      params.push(filters.teamId);
+      countParams.push(filters.teamId);
+    }
+
+    // From now data filtering
+    if (filters.fromNowData) {
+      const condition = ` AND b.fld_booking_date >= ?`;
+      sql += condition;
+      countSql += condition;
+      params.push(filters.fromNowData);
+      countParams.push(filters.fromNowData);
+    }
+
+    buildDateFilters();
+
+    // Keyword search
+    if (filters.search) {
+      const condition = ` AND (b.fld_name LIKE ? OR b.fld_email LIKE ? OR user.fld_name LIKE ? OR user.fld_email LIKE ?)`;
+      sql += condition;
+      countSql += condition;
+      const searchParams = [`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`];
+      params.push(...searchParams);
+      countParams.push(...searchParams);
+    }
+
+    addOrderBy();
+    addLimit();
+  };
+
+  const buildDateFilters = () => {
+    const isCreatedFilter = filters.filter_type === 'Created' || 
+      (!filters.filter_type && ['EXECUTIVE', 'SUPERADMIN', 'SUBADMIN'].includes(userType));
+    
+    const isBookingFilter = !filters.particularStatus && 
+      (filters.filter_type === 'Booking' || 
+       (!filters.filter_type && !['EXECUTIVE', 'SUPERADMIN', 'SUBADMIN'].includes(userType)));
+
+    const dateField = isCreatedFilter ? 'b.fld_addedon' : 'b.fld_booking_date';
+
+    if ((isCreatedFilter || isBookingFilter) && filters.fromDate && filters.toDate) {
+      if (filters.fromDate === filters.toDate) {
+        const condition = ` AND DATE(${dateField}) = ?`;
+        sql += condition;
+        countSql += condition;
+        params.push(filters.fromDate);
+        countParams.push(filters.fromDate);
+      } else {
+        const condition = ` AND DATE(${dateField}) BETWEEN ? AND ?`;
+        sql += condition;
+        countSql += condition;
+        params.push(filters.fromDate, filters.toDate);
+        countParams.push(filters.fromDate, filters.toDate);
+      }
+    }
+  };
+
+  const addOrderBy = () => {
+    sql += ` ORDER BY b.id DESC`;
+  };
+
+  const addLimit = () => {
+    if (type === 'all') {
+      sql += ` LIMIT ? OFFSET ?`;
+      params.push(limit, offset);
+    } else {
+      sql += ` LIMIT 50`;
+    }
+  };
+
+  const executeQuery = (conn) => {
+    buildFilters();
+    
+    // If pagination is needed, get total count first
+    if (type === 'all') {
+      conn.query(countSql, countParams, (countErr, countResults) => {
+        if (countErr) {
+          conn.release();
+          return callback(countErr);
+        }
+        
+        const totalRecords = countResults[0].total;
+        const totalPages = Math.ceil(totalRecords / limit);
+        
+        // Execute main query
+        conn.query(sql, params, (err, results) => {
+          conn.release();
+          if (err) return callback(err);
+          
+          const paginationData = {
+            data: results || [],
+            pagination: {
+              currentPage: page,
+              totalPages,
+              totalRecords,
+              limit,
+              hasNextPage: page < totalPages,
+              hasPreviousPage: page > 1
+            }
+          };
+          
+          if (filters.bookingId) {
+            return callback(null, results.length > 0 ? results[0] : false);
+          } else {
+            return callback(null, paginationData);
+          }
+        });
+      });
+    } else {
+      // Non-paginated query
+      conn.query(sql, params, (err, results) => {
+        conn.release();
+        if (err) return callback(err);
+        
+        if (results.length > 0) {
+          if (filters.bookingId) {
+            return callback(null, results[0]);
+          } else {
+            return callback(null, results);
+          }
+        } else {
+          return callback(null, false);
+        }
+      });
+    }
+  };
+
+  const handleUserTypeAccess = (connection) => {
+    // Handle SUBADMIN team filtering
+    if (userType === 'SUBADMIN') {
+      const statusCondition = ` AND (
+        b.fld_call_request_sts = 'Pending' OR
+        b.fld_call_request_sts = 'Completed' OR
+        b.fld_call_request_sts = 'Rescheduled' OR
+        b.fld_call_request_sts = 'Call Rescheduled' OR
+        b.fld_call_request_sts = 'Reject' OR
+        b.fld_call_request_sts = 'Accept' OR
+        b.fld_call_request_sts = 'Cancelled' OR
+        b.fld_call_request_sts = 'Client did not join' OR
+        b.fld_call_request_sts = 'Consultant Assigned' OR
+        b.fld_call_request_sts = 'Call Scheduled'
+      )`;
+      
+      sql += statusCondition;
+      countSql += statusCondition;
+
+      if (assignedTeam) {
+        const teamIds = assignedTeam.split(',').map(id => id.trim()).filter(Boolean);
+        const teamConditions = teamIds.map(() => 'FIND_IN_SET(?, b.fld_teamid)').join(' OR ');
+        const teamCondition = ` AND (b.fld_consultantid = ? OR ${teamConditions})`;
+        sql += teamCondition;
+        countSql += teamCondition;
+        params.push(userId, ...teamIds);
+        countParams.push(userId, ...teamIds);
+      } else {
+        const consultantCondition = ` AND b.fld_consultantid = ?`;
+        sql += consultantCondition;
+        countSql += consultantCondition;
+        params.push(userId);
+        countParams.push(userId);
+      }
+      
+      executeQuery(connection);
+    } 
+    // Handle CONSULTANT access
+    else if (userType === 'CONSULTANT' && filters.segment4 !== 'follower') {
+      const consultantCondition = ` AND b.fld_consultantid = ?`;
+      sql += consultantCondition;
+      countSql += consultantCondition;
+      params.push(userId);
+      countParams.push(userId);
+      executeQuery(connection);
+    }
+    // Handle EXECUTIVE access  
+    else if (userType === 'EXECUTIVE' && !filters.bookingId) {
+      const executiveCondition = ` AND b.fld_addedby = ?`;
+      sql += executiveCondition;
+      countSql += executiveCondition;
+      params.push(userId);
+      countParams.push(userId);
+      executeQuery(connection);
+    }
+    // Handle SUPERADMIN access
+    else if (userType === 'SUPERADMIN') {
+      executeQuery(connection);
+    }
+    // Fallback - no access
+    else {
+      const noAccessCondition = ` AND 1 = 0`;
+      sql += noAccessCondition;
+      countSql += noAccessCondition;
+      executeQuery(connection);
+    }
+  };
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+    handleUserTypeAccess(connection);
+  });
+};
 
 module.exports = {
   getBookings,
@@ -1623,4 +1977,5 @@ module.exports = {
   getLatestCompletedBookingStatusHistory,
   getLatestCompletedBookingHistory,
   checkConflictingBookings,
+  fetchSummaryBookings,
 };

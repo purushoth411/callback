@@ -48,6 +48,8 @@ router.post("/checkCompletedCall", bookingController.checkCompletedCall);
 router.post("/updateReassignCallStatus", bookingController.updateReassignCallStatus);
 router.post("/updateExternalConsultationStatus", bookingController.updateExternalConsultationStatus);
 router.post("/submitCallCompletionComment", bookingController.submitCallCompletionComment);
+router.post("/fetchSummaryBookings", bookingController.fetchSummaryBookings);
+router.post("/updateSubjectArea", bookingController.updateSubjectArea);
 
 
 

@@ -12,7 +12,7 @@ const path = require("path");
 const fs = require("fs");
 
 const fetchBookings = (req, res) => {
-  const userId = req.user?.id || req.body.userId; // Assuming JWT middleware or fallback
+  const userId = req.user?.id || req.body.userId; 
   const userType = req.user?.type || req.body.userType;
   const assigned_team = req.user?.assigned_team || req.body.assigned_team;
   const filters = req.body.filters || {};
@@ -2752,7 +2752,147 @@ const submitCallCompletionComment = (req, res) => {
   }
 };
 
+const fetchSummaryBookings = (req, res) => {
+  const payload = req.body.filterPayload || {};
+  const userId = payload.userId;
+  const userType = payload.userType;
+  const assignedTeam = payload.assigned_team;
+  const filters = payload.filters || {};
+  const dashboard_status = payload.dashboard_status || null;
+  const type = payload.type || null;
+  const page = parseInt(payload.page) || 1; // Get page from request, default to 1
 
+  // Validate required fields
+  if (!userId || !userType) {
+    return res.status(400).json({
+      status: false,
+      message: "Missing userId or userType",
+    });
+  }
+
+  // Validate page number
+  if (page < 1) {
+    return res.status(400).json({
+      status: false,
+      message: "Page number must be greater than 0",
+    });
+  }
+
+  bookingModel.fetchSummaryBookings(
+    userId,
+    userType,
+    assignedTeam,
+    filters,
+    type,
+    page, // Pass page parameter
+    (err, result) => {
+      if (err) {
+        console.error("Booking Fetch Error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Error fetching bookings",
+          error: err.message,
+        });
+      }
+
+      // Handle paginated response
+      if (type == 'all' && result && result.pagination) {
+        res.status(200).json({
+          status: true,
+          message: "Bookings fetched successfully",
+          data: result.data,
+          pagination: result.pagination,
+        });
+      } else {
+       
+        res.status(200).json({
+          status: true,
+          message: "Bookings fetched successfully",
+          data: result,
+        });
+      }
+    }
+  );
+};
+
+const updateSubjectArea = async (req, res) => {
+  try {
+    const { bookingid, consultant_id, subject_area, user } = req.body;
+
+    if (!bookingid || !consultant_id || !subject_area) {
+      return res.status(400).json({ status: false, message: "Missing required fields" });
+    }
+
+  
+    bookingModel.getBookingRowById(bookingid, (err, oldBooking) => {
+      if (err || !oldBooking) {
+        return res.status(500).json({ status: false, message: "Failed to retrieve booking details" });
+      }
+
+      const updateData = {
+        fld_consultantid: consultant_id,
+        fld_subject_area: subject_area,
+        fld_booking_date: null,
+        fld_booking_slot: null,
+        fld_booking_date_old: oldBooking.fld_booking_date,
+        fld_booking_slot_old: oldBooking.fld_booking_slot,
+        fld_consultation_sts: 'Pending',
+        fld_call_request_sts: 'Consultant Assigned',
+        fld_call_confirmation_status: '',
+        fld_addedon: moment().format('YYYY-MM-DD HH:mm:ss') // formatted with moment
+      };
+
+      // Update booking
+      bookingModel.updateBooking(bookingid, updateData, (updateErr, updated) => {
+        if (updateErr || !updated) {
+          return res.status(500).json({ status: false, message: "Failed to update booking" });
+        }
+
+        // Update RC call request status
+        if (oldBooking.fld_consultantid) {
+          const callRequestId = oldBooking.fld_call_request_id;
+          const rcCallRequestId = oldBooking.fld_rc_call_request_id;
+
+          if (callRequestId && rcCallRequestId) {
+            bookingModel.updateRcCallRequestSts(callRequestId, rcCallRequestId, 'Consultant Assigned', (rcErr) => {
+              if (rcErr) {
+                console.error("RC call request update failed:", rcErr);
+              }
+            });
+          }
+        }
+
+        // Insert booking history
+        const adminName = user?.fld_name || "Admin";
+        const commentDate = moment().format("D MMM YYYY");
+        const commentTime = moment().format("hh:mm a");
+
+        const comment = `Subject area and consultant updated by ${adminName} on ${commentDate} at ${commentTime}`;
+
+        const historyData = {
+          fld_booking_id: bookingid,
+          fld_comment: comment,
+          fld_notif_view_sts: 'READ',
+          fld_addedon: moment().format('YYYY-MM-DD')
+        };
+
+        bookingModel.insertBookingHistory(historyData, (historyErr) => {
+          if (historyErr) {
+            console.error("Failed to insert history", historyErr);
+          }
+
+          return res.status(200).json({
+            status: true,
+            message: "Subject area updated successfully"
+          });
+        });
+      });
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return res.status(500).json({ status: false, message: "Internal server error" });
+  }
+};
 
 
 module.exports = {
@@ -2789,4 +2929,6 @@ module.exports = {
   updateReassignCallStatus,
   updateExternalConsultationStatus,
   submitCallCompletionComment,
+  fetchSummaryBookings,
+  updateSubjectArea,
 };
