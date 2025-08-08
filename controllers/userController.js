@@ -85,26 +85,38 @@ const addUser = (req, res) => {
     return res.status(400).json({ status: false, message: "Missing required fields" });
   }
 
-  userModel.addUser({
-    usertype,
-    team_id,
-    username,
-    name,
-    email,
-    phone,
-    password,
-    consultant_type,
-    subadmin_type,
-    permissions,
-  }, (err, result) => {
+  userModel.checkUsernameExists(username, null, (err, exists) => {
     if (err) {
-      console.error("Error:", err);
-      return res.status(500).json({ status: false, message: "Database error ".err });
+      console.error("DB Error:", err);
+      return res.status(500).json({ status: false, message: "Database error" });
     }
 
-    return res.json({ status: true, message: "User added successfully" });
+    if (exists) {
+      return res.status(409).json({ status: false, message: "Username already exists" });
+    }
+
+    userModel.addUser({
+      usertype,
+      team_id,
+      username,
+      name,
+      email,
+      phone,
+      password,
+      consultant_type,
+      subadmin_type,
+      permissions,
+    }, (err, result) => {
+      if (err) {
+        console.error("Add User Error:", err);
+        return res.status(500).json({ status: false, message: "Database error" });
+      }
+
+      return res.json({ status: true, message: "User added successfully" });
+    });
   });
 };
+
 
 
 const updateUser = (req, res) => {
@@ -115,7 +127,6 @@ const updateUser = (req, res) => {
     name,
     email,
     phone,
-    
     consultant_type,
     subadmin_type,
     permissions,
@@ -125,29 +136,40 @@ const updateUser = (req, res) => {
     return res.status(400).json({ status: false, message: "Missing required fields" });
   }
 
-  userModel.updateUser(
-    {
-      user_id,
-      team_id,
-      username,
-      name,
-      email,
-      phone,
-     
-      consultant_type,
-      subadmin_type,
-      permissions: JSON.stringify(permissions || {}),
-    },
-    (err, result) => {
-      if (err) {
-        console.error("DB Error:", err);
-        return res.status(500).json({ status: false, message: "Database error" });
-      }
-
-      return res.json({ status: true, message: "User updated successfully" });
+  userModel.checkUsernameExists(username, user_id, (err, exists) => {
+    if (err) {
+      console.error("DB Error:", err);
+      return res.status(500).json({ status: false, message: "Database error" });
     }
-  );
+
+    if (exists) {
+      return res.status(409).json({ status: false, message: "Username already exists" });
+    }
+
+    userModel.updateUser(
+      {
+        user_id,
+        team_id,
+        username,
+        name,
+        email,
+        phone,
+        consultant_type,
+        subadmin_type,
+        permissions: JSON.stringify(permissions || {}),
+      },
+      (err, result) => {
+        if (err) {
+          console.error("Update Error:", err);
+          return res.status(500).json({ status: false, message: "Database error" });
+        }
+
+        return res.json({ status: true, message: "User updated successfully" });
+      }
+    );
+  });
 };
+
 
 const updateUserStatus = (req, res) => {
   const userId = req.params.id;
@@ -164,6 +186,24 @@ const updateUserStatus = (req, res) => {
     }
 
     return res.json({ status: true, message: "User status updated successfully" });
+  });
+};
+
+const updateAttendance = (req, res) => {
+  const userId = req.params.id;
+  const { attendance } = req.body;
+
+  if (!["PRESENT", "ABSENT"].includes(attendance)) {
+    return res.status(400).json({ status: false, message: "Invalid status value" });
+  }
+
+  userModel.updateAttendance(userId, attendance, (err, result) => {
+    if (err) {
+      console.error("DB Error:", err);
+      return res.status(500).json({ status: false, message: "Database error" });
+    }
+
+    return res.json({ status: true, message: "User attendance updated successfully" });
   });
 };
 
@@ -199,5 +239,6 @@ module.exports = {
     
     updateUser,
     updateUserStatus,
-    deleteUser
+    deleteUser,
+    updateAttendance
 };

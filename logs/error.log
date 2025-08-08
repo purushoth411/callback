@@ -396,3 +396,14 @@
     at Parser._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
     at Parser.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
 2025-08-06 16:31:40 | ERROR | Unhandled Rejection at:
+2025-08-08 13:12:41 | ERROR | ReferenceError: res is not defined
+    at C:\Users\Admin\Pictures\callback\models\helperModel.js:768:7
+    at Handshake.onConnect (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Pool.js:64:7)
+    at Handshake.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Handshake._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+    at Sequence.OkPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:92:8)
+    at Protocol._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
+    at Parser._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
+    at Parser.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
+    at Protocol.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Protocol.js:38:16)

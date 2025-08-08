@@ -15,6 +15,27 @@ const getUserByUserName = (username, callback) => {
   });
 };
 
+const checkUsernameExists = (username, excludeUserId, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    let sql = "SELECT COUNT(*) AS count FROM tbl_admin WHERE fld_username = ?";
+    const params = [username];
+
+    if (excludeUserId) {
+      sql += " AND id != ?";
+      params.push(excludeUserId);
+    }
+
+    connection.query(sql, params, (err, results) => {
+      connection.release();
+      if (err) return callback(err);
+
+      const exists = results[0].count > 0;
+      return callback(null, exists);
+    });
+  });
+};
 
 
 const getAllUsers = (filters, callback) => {
@@ -99,24 +120,23 @@ const addUser = (userData, callback) => {
   }
 
   const client_code = prefix + Math.floor(10000 + Math.random() * 90000);
-  const hashedPassword = crypto.createHash('md5').update(password).digest('hex');
-
+  const hashedPassword = crypto.createHash("md5").update(password).digest("hex");
   const team_id_str = Array.isArray(team_id) ? team_id.join(",") : team_id;
   const permissions_str = JSON.stringify(permissions || []);
   const isConsultant = usertype === "CONSULTANT" ? "PRESENT" : null;
   const isService = usertype === "CONSULTANT" ? "No" : null;
 
-  const sql = `
+  const insertUserSQL = `
     INSERT INTO tbl_admin 
     (fld_admin_type, fld_team_id, fld_client_code, fld_username, fld_name, fld_email, fld_phone, fld_password, fld_decrypt_password, fld_consultant_type, fld_subadmin_type, fld_permission, fld_addedon, fld_pass_last_upd_day, attendance, fld_sevice_provider)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?)
   `;
 
   db.getConnection((err, connection) => {
-    if (err) return callback(err, null);
+    if (err) return callback(err);
 
     connection.query(
-      sql,
+      insertUserSQL,
       [
         usertype,
         team_id_str,
@@ -133,9 +153,45 @@ const addUser = (userData, callback) => {
         isConsultant,
         isService,
       ],
-      (err, results) => {
-        connection.release();
-        return callback(err, results);
+      (err, result) => {
+        if (err) {
+          connection.release();
+          return callback(err);
+        }
+
+        const insertId = result.insertId;
+
+        // If usertype is CONSULTANT or SUBADMIN, insert additional data
+        if (usertype === "CONSULTANT" || usertype === "SUBADMIN") {
+          const settingSql = `
+            INSERT INTO tbl_consultant_setting 
+            (fld_consultantid, fld_selected_week_days, fld_mon_time_data, fld_tue_time_data, fld_wed_time_data, fld_thu_time_data, fld_fri_time_data, fld_addedon, fld_updatedon)
+            VALUES (?, '2,3,4,5,6', '09:00||18:00', '09:00||18:00', '09:00||18:00', '09:00||18:00', '09:00||18:00', NOW(), NOW())
+          `;
+
+          connection.query(settingSql, [insertId], (err1) => {
+            if (err1) {
+              connection.release();
+              return callback(err1);
+            }
+
+            const questionSql = `
+              INSERT INTO tbl_consultant_question_data 
+              (fld_consultantid, fld_addedon, fld_updatedon)
+              VALUES (?, NOW(), NOW())
+            `;
+
+            connection.query(questionSql, [insertId], (err2) => {
+              connection.release();
+              if (err2) return callback(err2);
+              return callback(null, { message: "User & settings inserted successfully" });
+            });
+          });
+        } else {
+          // No additional inserts needed
+          connection.release();
+          return callback(null, { message: "User inserted successfully" });
+        }
       }
     );
   });
@@ -205,6 +261,20 @@ const updateUserStatus = (userId, status, callback) => {
   });
 };
 
+const updateAttendance = (userId, attendance, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    const sql = `UPDATE tbl_admin SET attendance = ? WHERE id = ?`;
+    const params = [attendance, userId];
+
+    connection.query(sql, params, (err, result) => {
+      connection.release();
+      callback(err, result);
+    });
+  });
+};
+
 
 // Delete user
 const deleteUser = (id, callback) => {
@@ -229,5 +299,7 @@ module.exports = {
     
     updateUser,
     updateUserStatus,
-    deleteUser
+    deleteUser,
+    checkUsernameExists,
+    updateAttendance
 };

@@ -744,6 +744,33 @@ let params = [];
       });
     };
 
+  const markAsRead = (id, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) {
+      console.error("Error getting DB connection:", err);
+      return callback(err);
+    }
+
+    const readTime = moment().format("YYYY-MM-DD HH:mm:ss");
+    const query = `
+      UPDATE tbl_booking_chat 
+      SET fld_read_status = "READ", fld_read_time = ? 
+      WHERE id = ?
+    `;
+
+    connection.query(query, [readTime, id], (err, result) => {
+      connection.release(); 
+
+      if (err) {
+        console.error("Query error:", err);
+        return callback(err);
+      }
+
+      return callback(null, result);
+    });
+  });
+};
+
 module.exports = {
   getAllTeams,
   getAllActiveTeams,
@@ -770,5 +797,6 @@ module.exports = {
   getAllActiveBothConsultants,
   insertFollower,
   checkFollowerExists,
-  getNotifications
+  getNotifications,
+  markAsRead,
 };

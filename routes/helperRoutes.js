@@ -30,6 +30,7 @@ router.post("/getFollowerConsultant", helperController.getFollowerConsultant);
 router.post("/addFollower", helperController.addFollower);
 router.post("/updateExternalBookingInfo", helperController.updateExternalBookingInfo);
 router.post("/getNotifications", helperController.getNotifications);
+router.post("/markAsRead", helperController.markAsRead);
 
 
 

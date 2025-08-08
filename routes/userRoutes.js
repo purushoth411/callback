@@ -15,6 +15,7 @@ router.post('/adduser', userController.addUser);
 router.put('/update/:id', userController.updateUser);
 
 router.put('/update-status/:id', userController.updateUserStatus);
+router.put('/updateAttendance/:id', userController.updateAttendance);
 
 
 

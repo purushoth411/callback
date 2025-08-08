@@ -766,6 +766,28 @@ const getNotifications= (req, res) => {
   }
 };
 
+const markAsRead = (req, res) => {
+  const { id } = req.body;
+
+  if (!id) {
+    return res.status(400).json({ error: "Notification ID is required" });
+  }
+
+  try {
+    helperModel.markAsRead(id, (err) => {
+      if (err) {
+        console.error("Error in markAsRead:", err);
+        return res.status(500).json({ error: "Failed to mark notification as read" });
+      }
+
+      return res.status(200).json({ message: "Notification marked as read" });
+    });
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports = {
   getAllActiveTeams,
   getAllTeams,
@@ -792,5 +814,6 @@ getFollowerConsultant,
 addFollower,
 updateExternalBookingInfo,
 getNotifications,
+markAsRead,
 
 };
