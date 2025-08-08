@@ -8,6 +8,7 @@ const db = require("./config/db");
 const logger = require("./logger");
 
 
+
 const app = express();
 app.use(bodyParser.json());
 const server = http.createServer(app);
@@ -49,7 +50,23 @@ process.on("uncaughtException", (err) => {
   process.exit(1); // Optional: shutdown
 });
 
+// io.on("connection", (socket) => {
+//     socket.on("user-connected", (userId) => {
+//         onlineUsers.set(userId, socket.id);
+//         io.emit("online-users", Array.from(onlineUsers.keys())); // broadcast online list
+//     });
 
+
+//     socket.on("disconnect", () => {
+//         for (const [userId, sockId] of onlineUsers.entries()) {
+//             if (sockId === socket.id) {
+//                 onlineUsers.delete(userId);
+//                 break;
+//             }
+//         }
+//         //io.emit("online-users", Array.from(onlineUsers.keys())); // broadcast updated list
+//     });
+// });
 
 const PORT = process.env.PORT || 5500;
 

@@ -1,4 +1,5 @@
 const userModel = require('../models/userModel');
+const { getIO } = require("../socket");
 
 const loginUser = (req, res) => {
     const { username, userpass } = req.body;
@@ -202,7 +203,8 @@ const updateAttendance = (req, res) => {
       console.error("DB Error:", err);
       return res.status(500).json({ status: false, message: "Database error" });
     }
-
+        const io = getIO();
+        io.emit('updatedAttendance', { userId, attendance });
     return res.json({ status: true, message: "User attendance updated successfully" });
   });
 };
