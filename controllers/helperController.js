@@ -243,6 +243,7 @@ const getConsultantsBySubjectArea = (req, res) => {
         WHERE fld_name IN (${placeholders}) 
         AND fld_admin_type = 'CONSULTANT' 
         AND attendance = 'PRESENT'
+        AND status = 'Active'
       `;
 
       connection.query(query2, nameArray, (error2, consultants) => {

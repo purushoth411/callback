@@ -99,6 +99,27 @@ const updateDomainStatus = (domainId, status, callback) => {
   });
 };
 
+const getDomainbyId = (domainId, callback) => {
+  if (!domainId) return callback(new Error("Domain ID is required"));
+
+  const query = 'SELECT * FROM tbl_domain_pref WHERE id = ?';
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(query, [domainId], (error, results) => {
+      connection.release();
+      if (error) return callback(error);
+
+      if (results.length > 0) {
+        callback(null, results[0]);
+      } else {
+        callback(null, null); 
+      }
+    });
+  });
+};
+
 module.exports = {
     checkIfDomainExists,
  insertDomainPref,
@@ -106,4 +127,5 @@ module.exports = {
  updateDomainPref,
  deleteDomainById,
  updateDomainStatus,
+ getDomainbyId,
 };

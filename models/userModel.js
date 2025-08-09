@@ -184,13 +184,13 @@ const addUser = (userData, callback) => {
             connection.query(questionSql, [insertId], (err2) => {
               connection.release();
               if (err2) return callback(err2);
-              return callback(null, { message: "User & settings inserted successfully" });
+              return callback(null, { message: "User & Setting inserted successfully", insertId });
             });
           });
         } else {
           // No additional inserts needed
           connection.release();
-          return callback(null, { message: "User inserted successfully" });
+          return callback(null, { message: "User inserted successfully", insertId });
         }
       }
     );

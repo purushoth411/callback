@@ -771,6 +771,18 @@ let params = [];
   });
 };
 
+const getSubjectAreasByConsultantName = (consultantName, callback) => {
+  const query = `
+    SELECT domain 
+    FROM tbl_domain_pref
+    WHERE status = 'Active'
+      AND FIND_IN_SET(?, REPLACE(cosultantId, ' ', '')) > 0
+  `;
+  db.query(query, [consultantName.replace(/\s+/g, '')], callback);
+};
+
+
+
 module.exports = {
   getAllTeams,
   getAllActiveTeams,
@@ -799,4 +811,5 @@ module.exports = {
   checkFollowerExists,
   getNotifications,
   markAsRead,
+  getSubjectAreasByConsultantName,
 };

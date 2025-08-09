@@ -3,6 +3,7 @@ const helperModel = require("../models/helperModel");
 const domainModel = require("../models/domainModel");
 const db = require("../config/db");
 const moment =require('moment');
+const { getIO } = require("../socket");
 
 
 
@@ -31,7 +32,7 @@ const addDomain = (req, res) => {
     domain,
     cosultantId,
     fld_addedon: moment().format("YYYY-MM-DD HH:mm:ss"),
-    status: "Active", // default
+    status: "Active",
   };
 
   try {
@@ -51,7 +52,18 @@ const addDomain = (req, res) => {
           return res.json({ status: false, message: "Insert failed" });
         }
 
-        return res.json({ status: true, message: "Domain added successfully" });
+        // Now fetch the new domain and then emit
+        domainModel.getDomainbyId(insertId, (err, newDomain) => {
+          if (err) {
+            console.error("Fetch error:", err);
+            return res.json({ status: false, message: "Failed to fetch new domain" });
+          }
+
+          const io = getIO();
+          io.emit("domainAdded", newDomain);
+
+          return res.json({ status: true, message: "Domain added successfully" });
+        });
       });
     });
   } catch (err) {
@@ -59,6 +71,7 @@ const addDomain = (req, res) => {
     return res.json({ status: false, message: "Server error" });
   }
 };
+
 
 const updateDomain = (req, res) => {
   const { id } = req.params;

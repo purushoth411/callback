@@ -1,4 +1,6 @@
 const userModel = require('../models/userModel');
+const bookingModel = require('../models/bookingModel');
+const helperModel = require('../models/helperModel');
 const { getIO } = require("../socket");
 
 const loginUser = (req, res) => {
@@ -113,7 +115,17 @@ const addUser = (req, res) => {
         return res.status(500).json({ status: false, message: "Database error" });
       }
 
-      return res.json({ status: true, message: "User added successfully" });
+      bookingModel.getAdminById(result.insertId, (err, newUser) => {
+        if (err) {
+          console.error("Fetch New User Error:", err);
+          return res.status(500).json({ status: false, message: "Database error" });
+        }
+
+        const io = getIO();
+        io.emit("userAdded", newUser);
+
+        return res.json({ status: true, message: "User added successfully", user: newUser });
+      });
     });
   });
 };
@@ -180,13 +192,42 @@ const updateUserStatus = (req, res) => {
     return res.status(400).json({ status: false, message: "Invalid status value" });
   }
 
-  userModel.updateUserStatus(userId, status, (err, result) => {
+  userModel.updateUserStatus(userId, status, (err) => {
     if (err) {
       console.error("DB Error:", err);
       return res.status(500).json({ status: false, message: "Database error" });
     }
 
-    return res.json({ status: true, message: "User status updated successfully" });
+    bookingModel.getAdminById(userId, (err, userRow) => {
+      if (err) {
+        console.error("DB Fetch Error:", err);
+        return res.status(500).json({ status: false, message: "Error fetching user" });
+      }
+
+      if (!userRow) {
+        return res.status(404).json({ status: false, message: "User not found" });
+      }
+
+      // Fetch subject areas from tbl_domain_pref where consultantId matches fld_name
+      helperModel.getSubjectAreasByConsultantName(userRow.fld_name, (err, domains) => {
+        if (err) {
+          console.error("Domain Fetch Error:", err);
+          return res.status(500).json({ status: false, message: "Error fetching subject areas" });
+        }
+
+        const subjectAreas = domains.map(d => d.domain);
+        const enrichedUser = { ...userRow, subject_area: subjectAreas };
+
+        const io = getIO();
+        io.emit('updatedUserStatus', enrichedUser);
+
+        return res.json({
+          status: true,
+          message: "User status updated successfully",
+          data: enrichedUser
+        });
+      });
+    });
   });
 };
 
@@ -195,19 +236,49 @@ const updateAttendance = (req, res) => {
   const { attendance } = req.body;
 
   if (!["PRESENT", "ABSENT"].includes(attendance)) {
-    return res.status(400).json({ status: false, message: "Invalid status value" });
+    return res.status(400).json({ status: false, message: "Invalid attendance value" });
   }
 
-  userModel.updateAttendance(userId, attendance, (err, result) => {
+  userModel.updateAttendance(userId, attendance, (err) => {
     if (err) {
       console.error("DB Error:", err);
       return res.status(500).json({ status: false, message: "Database error" });
     }
+
+    bookingModel.getAdminById(userId, (err, userRow) => {
+      if (err) {
+        console.error("DB Fetch Error:", err);
+        return res.status(500).json({ status: false, message: "Error fetching user" });
+      }
+
+      if (!userRow) {
+        return res.status(404).json({ status: false, message: "User not found" });
+      }
+
+      // Fetch subject areas
+      helperModel.getSubjectAreasByConsultantName(userRow.fld_name, (err, domains) => {
+        if (err) {
+          console.error("Domain Fetch Error:", err);
+          return res.status(500).json({ status: false, message: "Error fetching subject areas" });
+        }
+
+        const subjectAreas = domains.map(d => d.domain);
+        const enrichedUser = { ...userRow, subject_area: subjectAreas };
+
         const io = getIO();
-        io.emit('updatedAttendance', { userId, attendance });
-    return res.json({ status: true, message: "User attendance updated successfully" });
+        io.emit('updatedAttendance', enrichedUser);
+
+        return res.json({
+          status: true,
+          message: "User attendance updated successfully",
+          data: enrichedUser
+        });
+      });
+    });
   });
 };
+
+
 
 const getAllUsersIncludingAdmin = (req, res) =>{
     userModel.getAllUsersIncludingAdmin((err, users) => {
