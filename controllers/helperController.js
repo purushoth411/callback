@@ -2,7 +2,8 @@
 const helperModel = require("../models/helperModel");
 const bookingModel = require("../models/bookingModel");
 const db = require("../config/db");
-const moment =require('moment');
+const moment = require("moment");
+const { getIO, getConnectedUsers } = require("../socket");
 
 const getAllActiveTeams = (req, res) => {
   helperModel.getAllActiveTeams((err, teams) => {
@@ -42,14 +43,32 @@ const addTeam = (req, res) => {
       .json({ status: false, message: "Team name is required" });
   }
 
-  helperModel.addTeam(teamData, (err, result) => {
+  helperModel.addTeam(teamData, (err, insertId) => {
     if (err) {
       console.error("Add team error:", err);
       return res
         .status(500)
         .json({ status: false, message: "Database error while adding team" });
     }
-    return res.json({ status: true, message: "Team added successfully" });
+
+    helperModel.getTeamById(insertId, (err, newTeam) => {
+      if (err) {
+        console.error("Fetch new team error:", err);
+        return res.json({
+          status: true,
+          message: "Team added, but failed to fetch data",
+        });
+      }
+
+      const io = getIO();
+      io.emit("teamAdded", newTeam);
+
+      return res.json({
+        status: true,
+        message: "Team added successfully",
+        team: newTeam,
+      });
+    });
   });
 };
 
@@ -69,7 +88,25 @@ const updateTeam = (req, res) => {
         .status(500)
         .json({ status: false, message: "Database error while updating team" });
     }
-    return res.json({ status: true, message: "Team updated successfully" });
+    helperModel.getTeamById(id, (err, updatedTeam) => {
+      if (err) {
+        console.error("Fetch new team error:", err);
+        return res.json({
+          status: true,
+          message: "Team updated, but failed to fetch data",
+        });
+      }
+
+      const io = getIO();
+      io.emit("teamUpdated", updatedTeam);
+
+      return res.json({
+        status: true,
+        message: "Team updated successfully",
+        team: updatedTeam,
+      });
+    });
+    // return res.json({ status: true, message: "Team updated successfully" });
   });
 };
 
@@ -89,9 +126,23 @@ const updateTeamStatus = (req, res) => {
       return res.status(500).json({ status: false, message: "Database error" });
     }
 
-    return res.json({
-      status: true,
-      message: "Team status updated successfully",
+    helperModel.getTeamById(teamId, (err, updatedTeam) => {
+      if (err) {
+        console.error("Fetch new team error:", err);
+        return res.json({
+          status: true,
+          message: "Team status updated, but failed to fetch data",
+        });
+      }
+
+      const io = getIO();
+      io.emit("teamStatusUpdated", updatedTeam);
+
+      return res.json({
+        status: true,
+        message: "Team Status updated successfully",
+        team: updatedTeam,
+      });
     });
   });
 };
@@ -154,21 +205,25 @@ const getAdmin = (req, res) => {
     helperModel.getAdmin(type, status, (err, results) => {
       if (err) {
         console.error("Error fetching admin list:", err);
-        return res.status(500).json({ status: false, message: "Database error" });
+        return res
+          .status(500)
+          .json({ status: false, message: "Database error" });
       }
 
       return res.json({ status: true, results });
     });
   } catch (err) {
     console.error("Error in getAdmin controller:", err);
-    return res.status(500).json({ status: false, message: "Server error occurred in controller" });
+    return res
+      .status(500)
+      .json({ status: false, message: "Server error occurred in controller" });
   }
 };
 
-const getPlanDetails=(req,res)=>{
-  try{
-    helperModel.getPlanDetails((err,results)=>{
-       if (err) {
+const getPlanDetails = (req, res) => {
+  try {
+    helperModel.getPlanDetails((err, results) => {
+      if (err) {
         console.error("Error fetching plans:", err);
         return res
           .status(500)
@@ -176,16 +231,14 @@ const getPlanDetails=(req,res)=>{
       }
 
       return res.json({ results });
-    })
-  }catch (err) {
+    });
+  } catch (err) {
     console.error("Error in getting plans:", err);
     return res
       .status(404)
       .json({ status: false, message: `Server error occurred in controller` });
   }
-}
-
-
+};
 
 // controllers/helperController.js
 const getConsultantsBySubjectArea = (req, res) => {
@@ -274,15 +327,17 @@ const getConsultantsBySubjectArea = (req, res) => {
 };
 
 const fetchBookingDetailsWithRc = (req, res) => {
-   const id = req.query.id;
-  helperModel.getBookingDetailsWithRc(id,(err, bookingRow) => {
+  const id = req.query.id;
+  helperModel.getBookingDetailsWithRc(id, (err, bookingRow) => {
     if (err) {
       console.error("Error fetching booking details:", err);
       return res.status(500).json({ status: false, message: "Database error" });
     }
 
     if (!bookingRow) {
-      return res.status(404).json({ status: false, message: "Booking not found" });
+      return res
+        .status(404)
+        .json({ status: false, message: "Booking not found" });
     }
 
     const consultantId = bookingRow.fld_consultantid;
@@ -290,7 +345,10 @@ const fetchBookingDetailsWithRc = (req, res) => {
     helperModel.getConsultantSettingData(consultantId, (err2, settingRow) => {
       if (err2) {
         console.error("Error fetching consultant setting:", err2);
-        return res.status(500).json({ status: false, message: "Error fetching consultant settings" });
+        return res.status(500).json({
+          status: false,
+          message: "Error fetching consultant settings",
+        });
       }
 
       return res.json({
@@ -309,14 +367,18 @@ const getUsersByRole = (req, res) => {
     helperModel.getUsersByRole(role, status, (err, results) => {
       if (err) {
         console.error("Error in getUsersByRole:", err);
-        return res.status(500).json({ status: false, message: "Database error" });
+        return res
+          .status(500)
+          .json({ status: false, message: "Database error" });
       }
 
       return res.json({ status: true, users: results });
     });
   } catch (error) {
     console.error("Unexpected error:", error);
-    return res.status(500).json({ status: false, message: "Internal server error" });
+    return res
+      .status(500)
+      .json({ status: false, message: "Internal server error" });
   }
 };
 
@@ -327,7 +389,9 @@ const getTimezones = (req, res) => {
     helperModel.fetchTimezones(viewtype, (err, timezones) => {
       if (err) {
         console.error("Error fetching timezones:", err);
-        return res.status(500).json({ status: false, message: "Database error" });
+        return res
+          .status(500)
+          .json({ status: false, message: "Database error" });
       }
 
       return res.status(200).json({ status: true, data: timezones });
@@ -345,7 +409,9 @@ const getBookingData = (req, res) => {
     helperModel.getBookingData(params, (err, result) => {
       if (err) {
         console.error("DB error:", err);
-        return res.status(500).json({ status: false, message: "Database error" });
+        return res
+          .status(500)
+          .json({ status: false, message: "Database error" });
       }
       return res.status(200).json({ status: true, data: result });
     });
@@ -362,7 +428,9 @@ const getRcCallBookingRequest = (req, res) => {
     helperModel.getRcCallBookingRequest(params, (err, result) => {
       if (err) {
         console.error("DB error:", err);
-        return res.status(500).json({ status: false, message: "Database error" });
+        return res
+          .status(500)
+          .json({ status: false, message: "Database error" });
       }
       return res.status(200).json({ status: true, data: result });
     });
@@ -377,21 +445,26 @@ const getMessageData = (req, res) => {
     const { bookingId } = req.query;
 
     if (!bookingId) {
-      return res.status(400).json({ status: false, message: "Missing bookingId" });
+      return res
+        .status(400)
+        .json({ status: false, message: "Missing bookingId" });
     }
 
     helperModel.getMessagesByBookingId(bookingId, (err, messages) => {
       if (err) {
         console.error("Error fetching messages:", err);
-        return res.status(500).json({ status: false, message: "Database error" });
+        return res
+          .status(500)
+          .json({ status: false, message: "Database error" });
       }
 
       return res.status(200).json({ status: true, messages });
     });
-
   } catch (error) {
     console.error("Unexpected error:", error);
-    return res.status(500).json({ status: false, message: "Unexpected server error" });
+    return res
+      .status(500)
+      .json({ status: false, message: "Unexpected server error" });
   }
 };
 
@@ -399,11 +472,14 @@ const chatSubmit = (req, res) => {
   const { comment, bookingid, sender_id, admin_type } = req.body;
 
   if (!comment || !bookingid || !sender_id || !admin_type) {
-    return res.status(400).json({ success: false, message: "Missing required fields" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Missing required fields" });
   }
 
   helperModel.getMessageCount(bookingid, (countErr, countResult) => {
-    if (countErr) return res.status(500).json({ success: false, message: "DB error" });
+    if (countErr)
+      return res.status(500).json({ success: false, message: "DB error" });
 
     if (countResult[0].count >= 5) {
       return res.status(200).json({ success: false, message: "limit_exceed" });
@@ -411,7 +487,9 @@ const chatSubmit = (req, res) => {
 
     bookingModel.getBookingById(bookingid, (bookErr, bookRows) => {
       if (bookErr || bookRows.length === 0) {
-        return res.status(404).json({ success: false, message: "Booking not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Booking not found" });
       }
 
       const booking = bookRows[0];
@@ -421,7 +499,9 @@ const chatSubmit = (req, res) => {
       } else if (admin_type === "EXECUTIVE") {
         receiver_id = booking.fld_consultantid;
       } else {
-        return res.status(400).json({ success: false, message: "Invalid admin type" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid admin type" });
       }
 
       const insertData = {
@@ -431,59 +511,82 @@ const chatSubmit = (req, res) => {
         fld_view_status: "NO",
         fld_sender_id: sender_id,
         fld_receiver_id: receiver_id,
-        fld_addedon: moment().format('YYYY-MM-DD') 
+        fld_addedon: moment().format("YYYY-MM-DD"),
       };
 
       helperModel.insertChatMessage(insertData, (insertErr, result) => {
         if (insertErr) {
-          return res.status(500).json({ success: false, message: "Insert failed" });
+          return res
+            .status(500)
+            .json({ success: false, message: "Insert failed" });
         }
 
-     return res.status(200).json({
-            success: true,
-            message: "Message sent",
-            chatId: result.insertId
-          });
+        const io = getIO();
+        const connectedUsers = getConnectedUsers();
+
+        const receiverSocketId = connectedUsers[receiver_id];
+        const adminSocketId = connectedUsers[1]; // assuming admin's user ID is 1
+
+        const payload = {
+          id: result.insertId, // New chat message ID
+          ...insertData, // All other message fields
+        };
+
+
+         // Emit to admin
+        if (adminSocketId) {
+          io.to(adminSocketId).emit("notification", payload);
+        }
+
+        // Emit to receiver
+        if (receiverSocketId) {
+          io.to(receiverSocketId).emit("notification", payload);
+        }
+
+       
+        return res.status(200).json({
+          success: true,
+          message: "Message sent",
+          chatId: result.insertId,
+        });
       });
     });
   });
 };
 
 const fetchFollowerData = (req, res) => {
-  const { id, follower_consultant_id, bookingid, consultantid, status } = req.body;
+  const { id, follower_consultant_id, bookingid, consultantid, status } =
+    req.body;
 
   const filters = {
     id,
     follower_consultant_id,
     bookingid,
     consultantid,
-    status
+    status,
   };
-  try{
+  try {
+    helperModel.getFollowerData(filters, (err, result) => {
+      if (err) {
+        console.error("DB Error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Server Error",
+          data: null,
+        });
+      }
 
-  helperModel.getFollowerData(filters, (err, result) => {
-    if (err) {
-      console.error("DB Error:", err);
-      return res.status(500).json({
-        status: false,
-        message: 'Server Error',
-        data: null
+      return res.status(200).json({
+        status: true,
+        message: "Follower data fetched successfully",
+        data: result,
       });
-    }
-
-    return res.status(200).json({
-      status: true,
-      message: 'Follower data fetched successfully',
-      data: result
     });
-  });
-}catch (error) {
-    console.error('Error in follower fetch:', error);
-    res.status(500).json({ status: false, message: 'Internal Server Error' });
+  } catch (error) {
+    console.error("Error in follower fetch:", error);
+    res.status(500).json({ status: false, message: "Internal Server Error" });
   }
 };
-
-
 
 const getSaturdayPosition = (dateString) => {
   const date = moment(dateString);
@@ -502,31 +605,37 @@ const getSaturdayPosition = (dateString) => {
 };
 
 const getEndTime = (startTime, hours, minutes) => {
-  const start = moment(startTime, 'h:mm A');
-  const end = start.clone().add(hours, 'hours').add(minutes, 'minutes');
-  return end.format('h:mm A');
+  const start = moment(startTime, "h:mm A");
+  const end = start.clone().add(hours, "hours").add(minutes, "minutes");
+  return end.format("h:mm A");
 };
 
 const getFollowerConsultant = (req, res) => {
   const { bookingid, user } = req.body;
 
   if (!bookingid || !user) {
-    return res.status(400).json({ status: false, message: "Missing required params" });
+    return res
+      .status(400)
+      .json({ status: false, message: "Missing required params" });
   }
 
   bookingModel.getBookingRowById(bookingid, (err, bookingData) => {
     if (err || !bookingData) {
-      return res.status(400).json({ status: false, message: "Invalid Booking ID", data: null });
+      return res
+        .status(400)
+        .json({ status: false, message: "Invalid Booking ID", data: null });
     }
 
     const bookingDateStr = bookingData.fld_booking_date;
     const bookingSlot = bookingData.fld_booking_slot;
-    const bookingMoment = moment(bookingDateStr, 'YYYY-MM-DD');
+    const bookingMoment = moment(bookingDateStr, "YYYY-MM-DD");
     const bookindateSaturday = getSaturdayPosition(bookingDateStr);
 
     helperModel.getAllActiveBothConsultants((err, consultants) => {
       if (err) {
-        return res.status(500).json({ status: false, message: "Error fetching consultants" });
+        return res
+          .status(500)
+          .json({ status: false, message: "Error fetching consultants" });
       }
 
       const availableConsultants = [];
@@ -539,7 +648,7 @@ const getFollowerConsultant = (req, res) => {
           return res.status(200).json({
             status: true,
             message: "Fetched follower consultants",
-            data: availableConsultants
+            data: availableConsultants,
           });
         }
 
@@ -553,51 +662,67 @@ const getFollowerConsultant = (req, res) => {
           selectedDate: bookingDateStr,
           status: "Reject",
           checkType: "CHECK_BOTH",
-          hideSubOption: "Yes"
+          hideSubOption: "Yes",
         };
 
         helperModel.getBookingData(params, (err, bookingList) => {
           const arrBookedSlots = [];
 
-          (bookingList || []).forEach(b => {
+          (bookingList || []).forEach((b) => {
             const startTime = b.fld_booking_slot;
-            const hoursMatch = b.fld_no_of_hours_for_call?.match(/(\d+(?:\.\d+)?)\s*Hour/);
+            const hoursMatch = b.fld_no_of_hours_for_call?.match(
+              /(\d+(?:\.\d+)?)\s*Hour/
+            );
             const totalHours = parseFloat(hoursMatch?.[1] || 0);
 
             const fullHours = Math.floor(totalHours);
             const extraMinutes = Math.round((totalHours - fullHours) * 60);
             const endTime = getEndTime(startTime, fullHours, extraMinutes);
 
-            let current = moment(startTime, 'h:mm A');
-            const finalEnd = moment(endTime, 'h:mm A');
+            let current = moment(startTime, "h:mm A");
+            const finalEnd = moment(endTime, "h:mm A");
 
             while (current.isBefore(finalEnd)) {
-              arrBookedSlots.push(current.format('h:mm A'));
-              current.add(30, 'minutes');
+              arrBookedSlots.push(current.format("h:mm A"));
+              current.add(30, "minutes");
             }
 
-            arrBookedSlots.push(finalEnd.format('h:mm A'));
+            arrBookedSlots.push(finalEnd.format("h:mm A"));
           });
 
-          helperModel.getConsultantSettingData(consultant.id, (err, settingData) => {
-            const weekdayShort = bookingMoment.format('ddd').toLowerCase(); // mon, tue...
-            const timeBlock = settingData?.[`fld_${weekdayShort}_time_block`];
+          helperModel.getConsultantSettingData(
+            consultant.id,
+            (err, settingData) => {
+              const weekdayShort = bookingMoment.format("ddd").toLowerCase(); // mon, tue...
+              const timeBlock = settingData?.[`fld_${weekdayShort}_time_block`];
 
-            if (timeBlock) {
-              const timeBlocks = timeBlock.split(' - ');
-              timeBlocks.forEach(t => arrBookedSlots.push(moment(t, 'h:mm A').format('h:mm A')));
+              if (timeBlock) {
+                const timeBlocks = timeBlock.split(" - ");
+                timeBlocks.forEach((t) =>
+                  arrBookedSlots.push(moment(t, "h:mm A").format("h:mm A"))
+                );
+              }
+
+              const isSlotTaken = arrBookedSlots.includes(
+                moment(bookingSlot, "HH:mm:ss").format("h:mm A")
+              );
+              const isDateExcluded = settingData?.fld_days_exclusion
+                ?.split("|~|")
+                .includes(bookingDateStr);
+              const isSaturdayOff = settingData?.fld_saturday_off
+                ?.split(",")
+                .includes(String(bookindateSaturday));
+
+              if (!isSlotTaken && !isDateExcluded && !isSaturdayOff) {
+                availableConsultants.push({
+                  id: consultant.id,
+                  name: consultant.fld_name,
+                });
+              }
+
+              processConsultant(); // move to next consultant
             }
-
-            const isSlotTaken = arrBookedSlots.includes(moment(bookingSlot, 'HH:mm:ss').format('h:mm A'));
-            const isDateExcluded = settingData?.fld_days_exclusion?.split('|~|').includes(bookingDateStr);
-            const isSaturdayOff = settingData?.fld_saturday_off?.split(',').includes(String(bookindateSaturday));
-
-            if (!isSlotTaken && !isDateExcluded && !isSaturdayOff) {
-              availableConsultants.push({ id: consultant.id, name: consultant.fld_name });
-            }
-
-            processConsultant(); // move to next consultant
-          });
+          );
         });
       };
 
@@ -607,161 +732,197 @@ const getFollowerConsultant = (req, res) => {
 };
 
 const addFollower = (req, res) => {
-  const {
-    bookingid,
-    user, 
-    followerConsultantId,
-    followerConsultantName
-  } = req.body;
+  const { bookingid, user, followerConsultantId, followerConsultantName } =
+    req.body;
 
-  if (!bookingid || !followerConsultantId || !followerConsultantName || !user?.id || !user?.fld_name) {
-    return res.status(400).json({ status: false, message: "Missing required data" });
+  if (
+    !bookingid ||
+    !followerConsultantId ||
+    !followerConsultantName ||
+    !user?.id ||
+    !user?.fld_name
+  ) {
+    return res
+      .status(400)
+      .json({ status: false, message: "Missing required data" });
   }
 
   bookingModel.getBookingRowById(bookingid, (err, bookingRow) => {
     if (err || !bookingRow) {
-      return res.status(404).json({ status: false, message: "Booking not found" });
+      return res
+        .status(404)
+        .json({ status: false, message: "Booking not found" });
     }
 
-    helperModel.checkFollowerExists(bookingid, followerConsultantId, (err, exists) => {
-      if (err) {
-        return res.status(500).json({ status: false, message: "Error checking existing follower" });
-      }
-
-      if (exists) {
-        return res.status(409).json({ status: false, message: "Follower already added" });
-      }
-
-      const addedon = moment().format('YYYY-MM-DD HH:mm:ss');
-      const followerData = {
-        bookingid: bookingid,
-        follower_consultant_id: followerConsultantId,
-        consultantid: user.id, // logged-in consultant ID
-        addedon: addedon
-      };
-
-      helperModel.insertFollower(followerData, (err, insertId) => {
-        if (err || !insertId) {
-          return res.status(500).json({ status: false, message: "Failed to insert follower" });
+    helperModel.checkFollowerExists(
+      bookingid,
+      followerConsultantId,
+      (err, exists) => {
+        if (err) {
+          return res.status(500).json({
+            status: false,
+            message: "Error checking existing follower",
+          });
         }
 
-        const commentDate = moment().format('D MMM YYYY');
-        const commentTime = moment().format('h:mm a');
-        const comment = `${user.fld_admin_type} ${user.fld_name} added ${followerConsultantName} as a follower on ${commentDate} at ${commentTime}`;
+        if (exists) {
+          return res
+            .status(409)
+            .json({ status: false, message: "Follower already added" });
+        }
 
-        const historyData = {
-          fld_booking_id: bookingid,
-          fld_comment: comment,
-          fld_notif_view_sts: 'READ',
-          fld_addedon: moment().format('YYYY-MM-DD')
+        const addedon = moment().format("YYYY-MM-DD HH:mm:ss");
+        const followerData = {
+          bookingid: bookingid,
+          follower_consultant_id: followerConsultantId,
+          consultantid: user.id, // logged-in consultant ID
+          addedon: addedon,
         };
 
-        bookingModel.insertBookingHistory(historyData, (err, historyId) => {
-          if (err || !historyId) {
-            return res.status(500).json({ status: false, message: "Failed to insert history" });
+        helperModel.insertFollower(followerData, (err, insertId) => {
+          if (err || !insertId) {
+            return res
+              .status(500)
+              .json({ status: false, message: "Failed to insert follower" });
           }
 
-          return res.status(200).json({
-            status: true,
-            message: "Follower added successfully",
-            followerId: insertId,
-            historyId: historyId
+          const commentDate = moment().format("D MMM YYYY");
+          const commentTime = moment().format("h:mm a");
+          const comment = `${user.fld_admin_type} ${user.fld_name} added ${followerConsultantName} as a follower on ${commentDate} at ${commentTime}`;
+
+          const historyData = {
+            fld_booking_id: bookingid,
+            fld_comment: comment,
+            fld_notif_view_sts: "READ",
+            fld_addedon: moment().format("YYYY-MM-DD"),
+          };
+
+          bookingModel.insertBookingHistory(historyData, (err, historyId) => {
+            if (err || !historyId) {
+              return res
+                .status(500)
+                .json({ status: false, message: "Failed to insert history" });
+            }
+
+            return res.status(200).json({
+              status: true,
+              message: "Follower added successfully",
+              followerId: insertId,
+              historyId: historyId,
+            });
           });
         });
-      });
-    });
+      }
+    );
   });
 };
 
-
 const updateExternalBookingInfo = (req, res) => {
-  const { bookingid, external_booking_time, external_booking_date, call_joining_link, user } = req.body;
+  const {
+    bookingid,
+    external_booking_time,
+    external_booking_date,
+    call_joining_link,
+    user,
+  } = req.body;
 
-  
-  if (!user || user.fld_admin_type !== 'EXECUTIVE') {
-    return res.status(401).json({ status: false, msg: 'Unauthorized access' });
+  if (!user || user.fld_admin_type !== "EXECUTIVE") {
+    return res.status(401).json({ status: false, msg: "Unauthorized access" });
   }
 
   // Validate required fields
   if (!bookingid || !external_booking_time || !external_booking_date) {
-    return res.status(400).json({ status: false, msg: 'Missing required data' });
+    return res
+      .status(400)
+      .json({ status: false, msg: "Missing required data" });
   }
 
   try {
-    const formattedDate = moment(external_booking_date, ['YYYY-MM-DD', 'DD-MM-YYYY']).format('YYYY-MM-DD');
-    const formattedTime = moment(external_booking_time, 'HH:mm').format('h:mm A');
+    const formattedDate = moment(external_booking_date, [
+      "YYYY-MM-DD",
+      "DD-MM-YYYY",
+    ]).format("YYYY-MM-DD");
+    const formattedTime = moment(external_booking_time, "HH:mm").format(
+      "h:mm A"
+    );
 
     const updateData = {
       fld_booking_date: formattedDate,
       fld_booking_slot: formattedTime,
-      fld_call_joining_link: (call_joining_link || '').trim()
+      fld_call_joining_link: (call_joining_link || "").trim(),
     };
 
     bookingModel.updateBooking(bookingid, updateData, (err1, result1) => {
       if (err1) {
-        console.error('Error updating booking:', err1);
-        return res.status(500).json({ status: false, msg: 'Error updating booking!' });
+        console.error("Error updating booking:", err1);
+        return res
+          .status(500)
+          .json({ status: false, msg: "Error updating booking!" });
       }
 
-      const adminName = user.fld_name || 'Unknown Admin';
-      const commentDate = moment().format('D MMM YYYY');
-      const commentTime = moment().format('h:mm a');
+      const adminName = user.fld_name || "Unknown Admin";
+      const commentDate = moment().format("D MMM YYYY");
+      const commentTime = moment().format("h:mm a");
       const comment = `External Call Booking Info Updated by CRM ${adminName} on ${commentDate} at ${commentTime}`;
 
       const historyData = {
         fld_booking_id: bookingid,
         fld_comment: comment,
-        fld_notif_for: 'SUBADMIN',
-        fld_addedon: moment().format('YYYY-MM-DD')
+        fld_notif_for: "SUBADMIN",
+        fld_addedon: moment().format("YYYY-MM-DD"),
       };
 
       bookingModel.insertBookingHistory(historyData, (err2, historyId) => {
         if (err2) {
-          console.error('Error inserting history:', err2);
-          return res.status(500).json({ status: false, msg: 'Error logging history!' });
+          console.error("Error inserting history:", err2);
+          return res
+            .status(500)
+            .json({ status: false, msg: "Error logging history!" });
         }
 
-        return res.status(200).json({ status: true, msg: 'Booking Info. Updated Successfully' });
+        return res
+          .status(200)
+          .json({ status: true, msg: "Booking Info. Updated Successfully" });
       });
     });
   } catch (error) {
-    console.error('Unexpected error:', error);
-    return res.status(500).json({ status: false, msg: 'Something went wrong' });
+    console.error("Unexpected error:", error);
+    return res.status(500).json({ status: false, msg: "Something went wrong" });
   }
 };
 
-const getNotifications= (req, res) => {
+const getNotifications = (req, res) => {
   try {
     const user = req.body;
     if (!user || !user.id || !user.fld_admin_type) {
       return res.status(400).json({
         status: false,
-        message: 'User ID and admin type are required',
+        message: "User ID and admin type are required",
       });
     }
 
     helperModel.getNotifications(user, (err, results) => {
       if (err) {
-        console.error('DB error:', err);
+        console.error("DB error:", err);
         return res.status(500).json({
           status: false,
-          message: 'Failed to fetch notifications',
+          message: "Failed to fetch notifications",
           error: err.message || err,
         });
       }
 
       return res.json({
         status: true,
-        message: 'Notifications fetched successfully',
+        message: "Notifications fetched successfully",
         data: results,
       });
     });
   } catch (error) {
     // This catches synchronous errors in controller code itself
-    console.error('Controller error:', error);
+    console.error("Controller error:", error);
     return res.status(500).json({
       status: false,
-      message: 'Internal server error',
+      message: "Internal server error",
       error: error.message || error,
     });
   }
@@ -778,7 +939,9 @@ const markAsRead = (req, res) => {
     helperModel.markAsRead(id, (err) => {
       if (err) {
         console.error("Error in markAsRead:", err);
-        return res.status(500).json({ error: "Failed to mark notification as read" });
+        return res
+          .status(500)
+          .json({ error: "Failed to mark notification as read" });
       }
 
       return res.status(200).json({ message: "Notification marked as read" });
@@ -806,15 +969,13 @@ module.exports = {
   getBookingData,
   getRcCallBookingRequest,
 
-
   getAdmin,
   getMessageData,
   chatSubmit,
   fetchFollowerData,
-getFollowerConsultant,
-addFollower,
-updateExternalBookingInfo,
-getNotifications,
-markAsRead,
-
+  getFollowerConsultant,
+  addFollower,
+  updateExternalBookingInfo,
+  getNotifications,
+  markAsRead,
 };

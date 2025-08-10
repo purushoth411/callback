@@ -906,3 +906,25 @@
     at Object.onceWrapper (node:events:633:28)
     at WebSocket.emit (node:events:519:28)
     at WebSocket.onClose (C:\Users\Admin\Pictures\callback\node_modules\engine.io\build\transport.js:114:14)
+2025-08-10 20:36:08 | ERROR | ReferenceError: getIO is not defined
+    at D:\React\callback\controllers\helperController.js:137:18
+    at Query.<anonymous> (D:\React\callback\models\helperModel.js:103:9)
+    at Query.<anonymous> (D:\React\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Query._callback (D:\React\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (D:\React\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+    at Query._handleFinalResultPacket (D:\React\callback\node_modules\mysql\lib\protocol\sequences\Query.js:149:8)
+    at Query.EofPacket (D:\React\callback\node_modules\mysql\lib\protocol\sequences\Query.js:133:8)
+    at Protocol._parsePacket (D:\React\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
+    at Parser._parsePacket (D:\React\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
+    at Parser.write (D:\React\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
+2025-08-10 22:11:54 | ERROR | ReferenceError: getConnectedUsers is not defined
+    at D:\React\callback\controllers\helperController.js:494:32
+    at Query.<anonymous> (D:\React\callback\models\helperModel.js:648:9)
+    at Query.<anonymous> (D:\React\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Query._callback (D:\React\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (D:\React\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+    at Query._handleFinalResultPacket (D:\React\callback\node_modules\mysql\lib\protocol\sequences\Query.js:149:8)
+    at Query.OkPacket (D:\React\callback\node_modules\mysql\lib\protocol\sequences\Query.js:74:10)
+    at Protocol._parsePacket (D:\React\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
+    at Parser._parsePacket (D:\React\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
+    at Parser.write (D:\React\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)

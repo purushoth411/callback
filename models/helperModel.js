@@ -49,10 +49,13 @@ const addTeam = (teamData, callback) => {
     connection.query(sql, [teamData.team], (queryErr, result) => {
       connection.release();
       if (queryErr) return callback(queryErr);
-      return callback(null, result);
+
+      // Return only the inserted ID
+      return callback(null, result.insertId);
     });
   });
 };
+
 
 // Update team title
 const updateTeam = (id, teamData, callback) => {
@@ -84,6 +87,26 @@ const updateTeamStatus = (teamId, status, callback) => {
   });
 };
 
+const getTeamById = (teamId, callback) => {
+  if (!teamId) return callback(new Error("Team ID is required"));
+
+  const query = 'SELECT * FROM tbl_team WHERE id = ?';
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(query, [teamId], (error, results) => {
+      connection.release();
+      if (error) return callback(error);
+
+      if (results.length > 0) {
+        callback(null, results[0]);
+      } else {
+        callback(null, null);
+      }
+    });
+  });
+};
 
 const getAllDomains = (callback) => {
   const sql = `
@@ -812,4 +835,5 @@ module.exports = {
   getNotifications,
   markAsRead,
   getSubjectAreasByConsultantName,
+  getTeamById,
 };

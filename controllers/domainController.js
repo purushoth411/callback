@@ -62,7 +62,7 @@ const addDomain = (req, res) => {
           const io = getIO();
           io.emit("domainAdded", newDomain);
 
-          return res.json({ status: true, message: "Domain added successfully" });
+          return res.json({ status: true, message: "Domain added successfully",domain:newDomain });
         });
       });
     });
@@ -108,7 +108,10 @@ const updateDomain = (req, res) => {
       }
 
       if (exists) {
-        return res.json({ status: false, message: "Domain name already used by another record!" });
+        return res.json({
+          status: false,
+          message: "Domain name already used by another record!",
+        });
       }
 
       domainModel.updateDomainPref(id, data, (err, affectedRows) => {
@@ -118,9 +121,30 @@ const updateDomain = (req, res) => {
         }
 
         if (affectedRows > 0) {
-          return res.json({ status: true, message: "Domain updated successfully" });
+          // Fetch updated record before emitting
+          domainModel.getDomainbyId(id, (err, updatedDomain) => {
+            if (err) {
+              console.error("Fetch updated domain error:", err);
+              return res.json({
+                status: true,
+                message: "Domain updated, but failed to fetch updated data",
+              });
+            }
+
+            const io = getIO();
+            io.emit("domainUpdated", updatedDomain);
+
+            return res.json({
+              status: true,
+              message: "Domain updated successfully",
+              domain: updatedDomain,
+            });
+          });
         } else {
-          return res.json({ status: false, message: "No changes made or record not found" });
+          return res.json({
+            status: false,
+            message: "No changes made or record not found",
+          });
         }
       });
     });
@@ -129,6 +153,7 @@ const updateDomain = (req, res) => {
     return res.json({ status: false, message: "Server error" });
   }
 };
+
 
 const deleteDomain = (req, res) => {
   const id = req.params.id;
@@ -144,13 +169,15 @@ const deleteDomain = (req, res) => {
     }
 
     if (result.affectedRows > 0) {
-      res.json({ status: true, message: "Domain deleted successfully" });
+      const io = getIO();
+      io.emit("domainDeleted", { id }); // Notify frontend
+
+      return res.json({ status: true, message: "Domain deleted successfully" });
     } else {
-      res.json({ status: false, message: "Domain not found" });
+      return res.json({ status: false, message: "Domain not found" });
     }
   });
 };
-
 
 const updateDomainStatus = (req, res) => {
   const domainId = req.params.id;
@@ -168,12 +195,32 @@ const updateDomainStatus = (req, res) => {
       return res.status(500).json({ status: false, message: "Database error" });
     }
 
-    return res.json({
-      status: true,
-      message: "Domain status updated successfully",
-    });
+    if (result.affectedRows > 0) {
+      // Fetch updated domain so frontend gets latest data
+      domainModel.getDomainbyId(domainId, (err, updatedDomain) => {
+        if (err) {
+          console.error("Fetch updated domain error:", err);
+          return res.json({
+            status: true,
+            message: "Status updated, but failed to fetch updated domain",
+          });
+        }
+
+        const io = getIO();
+        io.emit("domainStatusUpdated", updatedDomain);
+
+        return res.json({
+          status: true,
+          message: "Domain status updated successfully",
+          domain: updatedDomain,
+        });
+      });
+    } else {
+      return res.json({ status: false, message: "Domain not found" });
+    }
   });
 };
+
 
 module.exports = {
  addDomain,

@@ -176,8 +176,17 @@ const updateUser = (req, res) => {
           console.error("Update Error:", err);
           return res.status(500).json({ status: false, message: "Database error" });
         }
+        bookingModel.getAdminById(user_id, (err, updatedUser) => {
+        if (err) {
+          console.error("Fetch updated User Error:", err);
+          return res.status(500).json({ status: false, message: "Database error" });
+        }
+
+        const io = getIO();
+        io.emit("userUpdated", updatedUser);
 
         return res.json({ status: true, message: "User updated successfully" });
+      });
       }
     );
   });
