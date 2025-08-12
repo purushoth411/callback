@@ -28,15 +28,22 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const additionalRoutes = require('./routes/additionalRoutes');
 const domainRoutes = require('./routes/domainRoutes');
+const planRoutes = require('./routes/planRoutes');
+const approveaddcallrequestRoutes = require('./routes/approveaddcallrequestRoutes');
+const completedcallratingRoutes = require('./routes/completedcallratingRoutes');
+const followerRoutes = require('./routes/followerRoutes');
 
 
 app.use('/api/users', userRoutes);
-
 app.use('/api/helpers', helperRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/additional', additionalRoutes);
 app.use('/api/domains', domainRoutes);
+app.use('/api/plans', planRoutes);
+app.use('/api/approveaddcallrequests', approveaddcallrequestRoutes);
+app.use('/api/completedcallratings', completedcallratingRoutes);
+app.use('/api/followers', followerRoutes);
 
 
 

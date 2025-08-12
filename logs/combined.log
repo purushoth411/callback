@@ -928,3 +928,25 @@
     at Protocol._parsePacket (D:\React\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
     at Parser._parsePacket (D:\React\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
     at Parser.write (D:\React\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
+2025-08-11 10:21:04 | ERROR | ReferenceError: getIO is not defined
+    at C:\Users\Admin\Pictures\callback\controllers\bookingController.js:1111:18
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\models\bookingModel.js:1074:7)
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Query._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+    at Query._handleFinalResultPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:149:8)
+    at Query.OkPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:74:10)
+    at Protocol._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
+    at Parser._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
+    at Parser.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
+2025-08-11 10:58:20 | ERROR | ReferenceError: bookingid is not defined
+    at C:\Users\Admin\Pictures\callback\controllers\bookingController.js:616:48
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\models\bookingModel.js:689:18)
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Query._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+    at Query._handleFinalResultPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:149:8)
+    at Query.OkPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:74:10)
+    at Protocol._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
+    at Parser._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
+    at Parser.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)

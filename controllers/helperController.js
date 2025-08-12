@@ -803,7 +803,7 @@ const addFollower = (req, res) => {
                 .status(500)
                 .json({ status: false, message: "Failed to insert history" });
             }
-
+            emitBookingUpdate(bookingid);
             return res.status(200).json({
               status: true,
               message: "Follower added successfully",
@@ -880,6 +880,8 @@ const updateExternalBookingInfo = (req, res) => {
             .json({ status: false, msg: "Error logging history!" });
         }
 
+        emitBookingUpdate(bookingid);
+
         return res
           .status(200)
           .json({ status: true, msg: "Booking Info. Updated Successfully" });
@@ -951,6 +953,16 @@ const markAsRead = (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
+function emitBookingUpdate(bookingId) {
+  bookingModel.getBookingById(bookingId, (err, bookingRows) => {
+    if (!err && bookingRows && bookingRows.length > 0) {
+      const updatedBooking = bookingRows[0];
+      const io = getIO();
+      io.emit("bookingUpdated", updatedBooking);
+    }
+  });
+}
 
 module.exports = {
   getAllActiveTeams,
