@@ -1178,7 +1178,8 @@ const getOtherBookingData = (params, callback) => {
     bookingId = '',
     consultantId = '',
     bookingDate = '',
-    bookingSlot = ''
+    bookingSlot = '',
+    saleType ='',
   } = params;
 
   let conditions = [`tbl_booking.callDisabled IS NULL`];
@@ -1199,6 +1200,10 @@ const getOtherBookingData = (params, callback) => {
   if (bookingSlot) {
     conditions.push(`tbl_booking.fld_booking_slot = ?`);
     values.push(bookingSlot);
+  }
+   if (saleType) {
+    conditions.push(`tbl_booking.fld_sale_type = ?`);
+    values.push(saleType);
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -1937,6 +1942,41 @@ const fetchSummaryBookings = (userId, userType, assignedTeam, filters, type, pag
   });
 };
 
+const getBookingByOtpUrl = (bookingId, verifyOtpUrl, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err, null);
+
+    const query = `
+      SELECT 
+        b.*,
+        a1.fld_client_code AS crm_client_code,
+        a1.fld_name AS crm_name,
+        a1.fld_email AS crm_email,
+        a2.fld_client_code AS consultant_client_code,
+        a2.fld_name AS consultant_name,
+        a2.fld_email AS consultant_email,
+        a3.fld_client_code AS sec_consultant_client_code,
+        a3.fld_name AS sec_consultant_name,
+        a3.fld_email AS sec_consultant_email,
+        u.fld_name AS user_name,
+        u.fld_email AS user_email,
+        u.fld_phone AS user_phone
+      FROM tbl_booking b
+      LEFT JOIN tbl_admin a1 ON b.fld_addedby = a1.id
+      LEFT JOIN tbl_admin a2 ON b.fld_consultantid = a2.id
+      LEFT JOIN tbl_admin a3 ON b.fld_secondary_consultant_id = a3.id
+      LEFT JOIN tbl_user u ON b.fld_userid = u.id
+      WHERE b.id = ? AND b.fld_verify_otp_url = ?
+    `;
+
+    connection.query(query, [bookingId, verifyOtpUrl], (err, results) => {
+      connection.release();
+      callback(err, results);
+    });
+  });
+};
+
+
 module.exports = {
   getBookings,
   getBookingHistory,
@@ -1978,4 +2018,5 @@ module.exports = {
   getLatestCompletedBookingHistory,
   checkConflictingBookings,
   fetchSummaryBookings,
+  getBookingByOtpUrl,
 };

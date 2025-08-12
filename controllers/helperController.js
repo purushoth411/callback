@@ -4,6 +4,7 @@ const bookingModel = require("../models/bookingModel");
 const db = require("../config/db");
 const moment = require("moment");
 const { getIO, getConnectedUsers } = require("../socket");
+const sendPostmarkMail = require("../sendPostmarkMail");
 
 const getAllActiveTeams = (req, res) => {
   helperModel.getAllActiveTeams((err, teams) => {
@@ -964,6 +965,267 @@ function emitBookingUpdate(bookingId) {
   });
 }
 
+const verifyOtpUrl = (req, res) => {
+  const { bookingId, verifyOtpUrl } = req.body;
+
+  if (!bookingId || !verifyOtpUrl) {
+    return res.status(400).json({ status: false, message: "Invalid request" });
+  }
+
+  bookingModel.getBookingByOtpUrl(bookingId, verifyOtpUrl, (err, results) => {
+    if (err) {
+      return res.status(500).json({ status: false, message: "Database error" });
+    }
+
+    if (!results || results.length == 0) {
+      return res.json({ status: false, url_status: "Expired" });
+    }
+
+    const bookingInfo = results[0];
+    const name = bookingInfo.fld_name;
+    const email = bookingInfo.fld_email;
+    const verifyEmailOtp = Math.floor(1000 + Math.random() * 9000);
+
+    const status = bookingInfo.fld_call_confirmation_status;
+
+    if (!status || status === "Call Confirmation Pending at Client End") {
+      const updateData = {
+        fld_otp: verifyEmailOtp,
+        fld_call_confirmation_status: "Call Confirmation Pending at Client End",
+        fld_otp_addedon: moment().format("YYYY-MM-DD")
+      };
+
+      bookingModel.updateBooking(bookingId, updateData, () => {
+       
+          const subject = `Web Code Verification Code for 2 Factor Authentication ${process.env.WEBNAME}`;
+          const body = `
+            Hi ${name}, <br/><br/>
+            Your Web Code to verify 2 factor authentication is ${verifyEmailOtp}. <br/><br/>
+            Thanks & Regards,<br/> ${process.env.WEBNAME}
+          `;
+
+          sendPostmarkMail(
+            {
+              from: process.env.FROM_EMAIL,
+              to: email,
+              subject,
+              body
+            },
+            () => {}
+          );
+        
+      });
+    }
+
+    return res.json({
+      status: true,
+      booking: bookingInfo,
+      verifyemailotp: verifyEmailOtp,
+      url_status: "Valid"
+    });
+  });
+};
+
+const validateOtp = (req, res) => {
+  const { str2, booking_id } = req.body;
+
+  if (!str2 || !booking_id) {
+    return res.status(400).json({ status: false, message: "error" });
+  }
+bookingModel.getBookingById(booking_id, (err, bookingRows) => {
+    // Proper DB error handling
+    if (err) {
+      console.error("DB error:", err);
+      return res.status(500).json({ status: false, message: "Server error" });
+    }
+
+    // No booking found
+    if (!bookingRows || bookingRows.length === 0) {
+      return res.status(404).json({ status: false, message: "Booking not found" });
+    }
+
+    const bookingInfo = bookingRows[0];
+     
+
+    if (!bookingInfo) {
+      return res.status(404).json({ status: false, message: "Booking not found" });
+    }
+
+    // If both OTP and verify URL are empty
+    if (!bookingInfo.fld_verify_otp_url && !bookingInfo.fld_otp) {
+      return res.json({ status: false, message: "other_confirmed" });
+    }
+
+    // OTP matches
+    if (String(bookingInfo.fld_otp).trim() === String(str2).trim()) {
+      const updateData = {
+        fld_call_confirmation_status: "Call Confirmed by Client",
+        fld_otp: "",
+        fld_verify_otp_url: null,
+        fld_consultation_sts: "Accept",
+        fld_call_request_sts: "Accept",
+        fld_status_options:
+          "I have gone through all the details,I have received the meeting link",
+      };
+
+      bookingModel.updateBooking(booking_id, updateData, (err) => {
+        if (err) {
+          console.error("Update booking error:", err);
+          return res.status(500).json({ status: false, message: "Server error" });
+        }
+
+        // Insert booking history
+        const currentDate = moment().format("D MMM YYYY");
+        const currentTime = moment().format("h:mm a");
+        const comment = `Call validated by client on ${currentDate} at ${currentTime}`;
+
+        bookingModel.insertBookingHistory({
+          fld_booking_id: booking_id,
+          fld_comment: comment,
+          fld_notif_for: "EXECUTIVE",
+          fld_notif_for_id: bookingInfo.fld_addedby,
+          fld_addedon: new Date(),
+        }, (err) => {
+          if (err) {
+            console.error("Insert history error:", err);
+            return res.status(500).json({ status: false, message: "Server error" });
+          }
+
+          // If call related to a consultant
+          if (
+            bookingInfo.fld_call_related_to !== "I_am_not_sure" &&
+            bookingInfo.fld_consultantid > 0
+          ) {
+            const proceedAfterRCUpdate = () => {
+              bookingModel.getOtherBookingData({
+                consultantId: bookingInfo.fld_consultantid,
+                bookingDate: bookingInfo.fld_booking_date,
+                bookingSlot: bookingInfo.fld_booking_slot,
+                saleType: bookingInfo.fld_sale_type,
+              }, (err, otherBookings) => {
+                if (err) {
+                  console.error("Get other bookings error:", err);
+                  return res.status(500).json({ status: false, message: "Server error" });
+                }
+
+                const currentDateRes = moment().format("D MMM YYYY");
+                const currentTimeRes = moment().format("h:mm a");
+
+                let processed = 0;
+                if (!otherBookings.length) {
+                  sendConfirmedMail();
+                  return;
+                }
+
+                otherBookings.forEach((row) => {
+                  if (
+                    row.id !== booking_id &&
+                    row.fld_consultant_another_option !== "TEAM" &&
+                    row.fld_call_confirmation_status !== "Call Confirmed by Client" &&
+                    row.fld_call_request_sts !== "Cancelled" &&
+                    row.fld_call_request_sts !== "Reject"
+                  ) {
+                    bookingModel.updateBooking(row.id, {
+                      fld_call_confirmation_status: "",
+                      fld_booking_date: null,
+                      fld_booking_slot: null,
+                      fld_call_request_sts: "Rescheduled",
+                      fld_consultation_sts: "Rescheduled",
+                      fld_verify_otp_url: null,
+                      fld_otp: "",
+                    }, (err) => {
+                      if (err) console.error("Error rescheduling:", err);
+
+                      if (row.fld_call_request_id > 0 && row.fld_rc_call_request_id > 0) {
+                        bookingModel.updateRcCallRequestSts(
+                          row.fld_call_request_id,
+                          row.fld_rc_call_request_id,
+                          "Rescheduled",
+                          () => {}
+                        );
+                      }
+
+                      bookingModel.insertBookingHistory({
+                        fld_booking_id: row.id,
+                        fld_comment: `Call cancelled and to be rescheduled as client did not confirm on ${currentDateRes} at ${currentTimeRes}`,
+                        fld_notif_for: "EXECUTIVE",
+                        fld_notif_for_id: row.fld_addedby,
+                        fld_addedon: new Date(),
+                      }, () => {});
+
+                      bookingModel.getAdminById(row.fld_addedby, (err, crmDetails) => {
+                        if (!err && crmDetails && process.env.HOST !== "localhost") {
+                          sendPostmarkMail({
+                            to: crmDetails.fld_email,
+                            subject: `Call Rescheduled – Reference ID: ${row.fld_client_id}`,
+                            body: `
+                              Hi ${crmDetails.fld_name},<br><br>
+                              This is to inform you that the scheduled call with the client has been <strong>cancelled and to be rescheduled</strong> as the client did not confirm.<br><br>
+                              <strong>Details:</strong><br>
+                              Reference ID: ${row.fld_client_id}<br>
+                              Client Name: ${row.fld_name}<br><br>
+                              Regards,<br>${process.env.WEBNAME}<br>
+                            `,
+                          });
+                        }
+                        processed++;
+                        if (processed === otherBookings.length) {
+                          sendConfirmedMail();
+                        }
+                      });
+                    });
+                  } else {
+                    processed++;
+                    if (processed === otherBookings.length) {
+                      sendConfirmedMail();
+                    }
+                  }
+                });
+              });
+            };
+
+            // If RC Call Request needs updating
+            if (bookingInfo.fld_call_request_id > 0 && bookingInfo.fld_rc_call_request_id > 0) {
+              bookingModel.updateRcCallRequestSts(
+                bookingInfo.fld_call_request_id,
+                bookingInfo.fld_rc_call_request_id,
+                "Accept",
+                proceedAfterRCUpdate
+              );
+            } else {
+              proceedAfterRCUpdate();
+            }
+
+            const sendConfirmedMail = () => {
+              bookingModel.getAdminById(bookingInfo.fld_addedby, (err, crmDetails) => {
+                if (!err && crmDetails && process.env.HOST !== "localhost") {
+                  // sendPostmarkMail({
+                  //   to: crmDetails.fld_email,
+                  //   subject: `Call confirmed by client ${bookingInfo.fld_name} - Booking Id ${bookingInfo.fld_bookingcode} || ${process.env.WEBNAME}`,
+                  //   body: `
+                  //     Hi ${crmDetails.fld_name},<br/><br/>
+                  //     The client ${bookingInfo.fld_name} with booking id ${bookingInfo.fld_bookingcode} has confirmed the call and will be available.<br/><br/>
+                  //     Thanks & regards,<br/>${process.env.WEBNAME}<br/>
+                  //   `,
+                  // });
+                }
+                res.json({ status: true, bookingId: booking_id });
+              });
+            };
+
+          } else {
+            return res.json({ status: true, bookingId: booking_id });
+          }
+        });
+      });
+    } else {
+      return res.json({ status: false, message: "fail" });
+    }
+  });
+};
+
+
+
 module.exports = {
   getAllActiveTeams,
   getAllTeams,
@@ -990,4 +1252,6 @@ module.exports = {
   updateExternalBookingInfo,
   getNotifications,
   markAsRead,
+  verifyOtpUrl,
+  validateOtp,
 };
