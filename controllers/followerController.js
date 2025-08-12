@@ -2,6 +2,7 @@
 const followerModel = require("../models/followerModel");
 const db = require("../config/db");
 const moment =require('moment');
+const { getIO } = require("../socket");
 
 const getAllActiveFollowers = (req, res) => {
   followerModel.getAllActiveFollowers((err, Followers) => {
@@ -50,8 +51,9 @@ const followerclaimbooking = (req, res) => {
         }
 
         if (existingbooking) {
-            let bookingTime = new Date(`${existingbooking.fld_booking_date} ${existingbooking.fld_booking_slot}`); // use ISO format
-            let currentTime = new Date();
+           let bookingTime = moment(`${existingbooking.fld_booking_date} ${existingbooking.fld_booking_slot}`, "YYYY-MM-DD HH:mm");
+let currentTime = moment();
+
 
             if (currentTime<bookingTime)
             {
@@ -80,6 +82,8 @@ const followerclaimbooking = (req, res) => {
                   if (err) {
                       return res.status(500).json({ status: false, message: 'Failed to add Subject area: ' + err });
                   }
+                  const io=getIO();
+                   io.emit("callClaimed", followerId);
                   return res.json({ status: true, message: 'Booking claimed successfully', insertId: result.insertId });
               });
             });
