@@ -572,47 +572,103 @@ const insertCallRequest = (req, res) => {
 
                     // STEP 11: Booking history for consultants
                     if (consultant_id) {
-                      const comment1 = `Call assigned for consultant ${consultant_id} by ${adminId} on ${getFormattedDate()} at ${getFormattedTime()}`;
+                      bookingModel.getAdminById(
+                        consultantId,
+                        (err, consultantInfo) => {
+                          if (err) {
+                            console.error(
+                              `Error fetching ${label} consultant info:`,
+                              err
+                            );
+                            return;
+                          }
 
-                      const history1 = {
-                        fld_booking_id: bookingId,
-                        fld_comment: comment1,
-                        fld_notif_for: "EXECUTIVE",
-                        fld_notif_for_id: user?.fld_admin_id || adminId,
-                        fld_addedon: moment().format("YYYY-MM-DD"),
-                      };
+                          if (!consultantInfo) {
+                            console.warn(
+                              `${label} consultant not found:`,
+                              consultantId
+                            );
+                            return;
+                          }
 
-                      bookingModel.insertBookingHistory(history1, (err) => {
-                        if (err)
-                          console.error(
-                            "Primary consultant history insert failed:",
-                            err.message
-                          );
-                      });
+                          const comment = `Call assigned for consultant ${
+                            consultantInfo.fld_name
+                          } by ${
+                            user?.fld_name || "Admin"
+                          } on ${getFormattedDate()} at ${getFormattedTime()}`;
+
+                          const history1 = {
+                            fld_booking_id: bookingId,
+                            fld_comment: comment1,
+                            fld_notif_for: "EXECUTIVE",
+                            fld_notif_for_id: user?.fld_admin_id || adminId,
+                            fld_addedon: moment().format("YYYY-MM-DD"),
+                          };
+
+                          bookingModel.insertBookingHistory(history1, (err) => {
+                            if (err)
+                              console.error(
+                                "Primary consultant history insert failed:",
+                                err.message
+                              );
+                          });
+                        }
+                      );
                     }
 
                     if (
                       secondary_consultant_id &&
                       secondary_consultant_id !== 0
                     ) {
-                      const comment2 = `Call assigned for consultant ${secondary_consultant_id} by ${adminId} on ${getFormattedDate()} at ${getFormattedTime()}`;
+                      bookingModel.getAdminById(
+                        secondary_consultant_id,
+                        (err, secConsultantInfo) => {
+                          if (err) {
+                            console.error(
+                              "Error fetching sec consultant info:",
+                              err
+                            );
+                            return res
+                              .status(500)
+                              .json({
+                                status: false,
+                                message: "Secondary consultant info error",
+                              });
+                          }
 
-                      const history2 = {
-                        fld_booking_id: bookingId,
-                        fld_comment: comment2,
-                        fld_notif_for: "EXECUTIVE",
-                        fld_notif_for_id: user?.fld_admin_id || adminId,
-                        fld_addedon: moment().format("YYYY-MM-DD"),
-                      };
+                          if (!secConsultantInfo) {
+                            console.warn(
+                              `No consultant found for ID: ${secondary_consultant_id}`
+                            );
+                            return;
+                          }
 
-                      bookingModel.insertBookingHistory(history2, (err) => {
-                        if (err)
-                          console.error(
-                            "Secondary consultant history insert failed:",
-                            err.message
-                          );
-                      });
+                          const comment2 = `Call assigned for consultant ${
+                            secConsultantInfo.fld_name
+                          } by ${
+                            user?.fld_name || "Admin"
+                          } on ${getFormattedDate()} at ${getFormattedTime()}`;
+
+                          const history2 = {
+                            fld_booking_id: bookingId,
+                            fld_comment: comment2,
+                            fld_notif_for: "EXECUTIVE",
+                            fld_notif_for_id: user?.fld_admin_id || adminId,
+                            fld_addedon: moment().format("YYYY-MM-DD"),
+                          };
+
+                          bookingModel.insertBookingHistory(history2, (err) => {
+                            if (err) {
+                              console.error(
+                                "Secondary consultant history insert failed:",
+                                err.message
+                              );
+                            }
+                          });
+                        }
+                      );
                     }
+
                     bookingModel.getBookingById(
                       bookingId,
                       (err, bookingRows) => {
@@ -679,21 +735,11 @@ function generateUserCode() {
 }
 
 function getFormattedDate() {
-  const d = new Date();
-  return d.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return moment().format("DD-MMM-YYYY"); // e.g., 13-Aug-2025
 }
 
 function getFormattedTime() {
-  const d = new Date();
-  return d.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+  return moment().format("hh:mm A"); // e.g., 10:45 AM
 }
 
 const checkPostsaleCompletedCalls = (req, res) => {
@@ -1340,23 +1386,23 @@ const updateStatusByCrm = (req, res) => {
               status: false,
               message: "Error inserting booking history",
             });
-            bookingModel.getBookingById(bookingid, (err, bookingRows) => {
+          bookingModel.getBookingById(bookingid, (err, bookingRows) => {
             if (err || !bookingRows || bookingRows.length === 0) {
               return res.json({
-            status: true,
-            message: "Status updated successfully",
-          });
+                status: true,
+                message: "Status updated successfully",
+              });
             }
 
             const updatedBooking = bookingRows[0];
             const io = getIO();
             io.emit("bookingUpdated", updatedBooking);
 
-           return res.json({
-            status: true,
-            message: "Status updated successfully",
+            return res.json({
+              status: true,
+              message: "Status updated successfully",
+            });
           });
-          });          
         });
       });
     });
@@ -1506,7 +1552,7 @@ const markAsConfirmByClient = (req, res) => {
                   message: "Failed to update RC call request",
                 });
               }
-              
+
               sendConfirmationEmail(booking, res);
             }
           );
@@ -1534,31 +1580,35 @@ function sendConfirmationEmail(booking, res) {
       Thanks & regards,<br/>${WEBNAME}<br/>
     `;
 
-    sendPostmarkMail({ from: FROM_EMAIL, to: "web@thesisindia.net", subject, body }, (mailErr) => {
-      if (mailErr) {
-        return sendFinalResponse2("Call confirmed successfully but Failed to Send Mail");
-      }
-
-      bookingModel.getBookingById(booking.id, (err, bookingRows) => {
-        if (!err && bookingRows && bookingRows.length > 0) {
-          const updatedBooking = bookingRows[0];
-          const io = getIO();
-          io.emit("bookingUpdated", updatedBooking);
+    sendPostmarkMail(
+      { from: FROM_EMAIL, to: "web@thesisindia.net", subject, body },
+      (mailErr) => {
+        if (mailErr) {
+          return sendFinalResponse2(
+            "Call confirmed successfully but Failed to Send Mail"
+          );
         }
-        sendFinalResponse2("Call confirmed successfully");
-      });
-    });
+
+        bookingModel.getBookingById(booking.id, (err, bookingRows) => {
+          if (!err && bookingRows && bookingRows.length > 0) {
+            const updatedBooking = bookingRows[0];
+            const io = getIO();
+            io.emit("bookingUpdated", updatedBooking);
+          }
+          sendFinalResponse2("Call confirmed successfully");
+        });
+      }
+    );
   });
 
   function sendFinalResponse2(message) {
     res.status(200).json({
       status: true,
       message,
-      reschedulePending: true
+      reschedulePending: true,
     });
   }
 }
-
 
 const rescheduleOtherBookings = (req, res) => {
   const { bookingId } = req.body;
@@ -1647,7 +1697,11 @@ const rescheduleOtherBookings = (req, res) => {
               }
 
               bookingModel.getBookingById(row.id, (err, updatedBookingRows) => {
-                if (!err && updatedBookingRows && updatedBookingRows.length > 0) {
+                if (
+                  !err &&
+                  updatedBookingRows &&
+                  updatedBookingRows.length > 0
+                ) {
                   const updatedBooking = updatedBookingRows[0];
                   io.emit("bookingUpdated", updatedBooking);
                 }
@@ -3138,7 +3192,6 @@ function emitBookingUpdate(bookingId) {
     }
   });
 }
-
 
 module.exports = {
   fetchBookings,
