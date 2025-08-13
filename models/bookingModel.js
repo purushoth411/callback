@@ -976,6 +976,36 @@ const updateRcCallRequestSts = (callRequestId, rcCallRequestId, status, callback
   });
 };
 
+const getRcCallBookingRequestById = (id, callback) => {
+  if (!id || Number(id) <= 0) {
+    return callback(new Error("Invalid ID provided"));
+  }
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    const sql = `
+      SELECT 
+        tbl_rc_call_booking_request.*, 
+        tbl_booking.id AS bookingid, 
+        crm.fld_name
+      FROM tbl_rc_call_booking_request
+      LEFT JOIN tbl_booking 
+        ON tbl_rc_call_booking_request.id = tbl_booking.fld_call_request_id
+      LEFT JOIN tbl_admin AS crm 
+        ON tbl_rc_call_booking_request.crmid = crm.id
+      WHERE tbl_rc_call_booking_request.id = ?
+      LIMIT 1
+    `;
+
+    connection.query(sql, [id], (error, results) => {
+      connection.release();
+      if (error) return callback(error);
+      return callback(null, results[0] || null);
+    });
+  });
+};
+
 
 const getPostsaleCompletedCalls = (email, milestone_id, callback) => {
   const query = `
@@ -2019,4 +2049,5 @@ module.exports = {
   checkConflictingBookings,
   fetchSummaryBookings,
   getBookingByOtpUrl,
+  getRcCallBookingRequestById,
 };

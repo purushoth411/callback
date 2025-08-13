@@ -2,6 +2,7 @@
 const approveaddcallrequestModel = require("../models/approveaddcallrequestModel");
 const db = require("../config/db");
 const moment =require('moment');
+const { getIO } = require("../socket");
 
 const getAllActiveApproveaddcallrequests = (req, res) => {
   approveaddcallrequestModel.getAllActiveApproveaddcallrequests((err, Approveaddcallrequests) => {
@@ -48,7 +49,8 @@ const updateApproveaddcallrequeststatus = (req, res) => {
       console.error("DB Error:", err);
       return res.status(500).json({ status: false, message: "Database error" });
     }
-
+     const io = getIO();
+      io.emit("updatedCallRequestStatus",approveaddcallrequestId,status);
     return res.json({
       status: true,
       message: "Request status updated successfully",

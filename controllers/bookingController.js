@@ -5,7 +5,8 @@ const crypto = require("crypto");
 const logger = require("../logger");
 const moment = require("moment-timezone");
 const FormData = require("form-data");
-
+const { PutObjectCommand } = require("@aws-sdk/client-s3");
+const r2 = require("../r2Client");
 const axios = require("axios");
 const multer = require("multer");
 const path = require("path");
@@ -523,6 +524,9 @@ const insertCallRequest = (req, res) => {
                         "Consultant Assigned",
                         () => {}
                       );
+                      if (call_request_id && rc_call_request_id) {
+                        emitRcBookingUpdate(call_request_id);
+                      }
                     }
 
                     if (call_related_to === "I_am_not_sure") {
@@ -628,12 +632,10 @@ const insertCallRequest = (req, res) => {
                               "Error fetching sec consultant info:",
                               err
                             );
-                            return res
-                              .status(500)
-                              .json({
-                                status: false,
-                                message: "Secondary consultant info error",
-                              });
+                            return res.status(500).json({
+                              status: false,
+                              message: "Secondary consultant info error",
+                            });
                           }
 
                           if (!secConsultantInfo) {
@@ -859,13 +861,14 @@ const saveCallScheduling = (req, res) => {
 
             bookingModel.insertBookingHistory(secHistory, (err) => {
               if (err) {
+                emitBookingUpdate(bookingId);
                 return res.json({
                   status: true,
                   message:
                     "Call scheduled, but failed to log secondary consultant history.",
                 });
               }
-
+              emitBookingUpdate(bookingId);
               return res.json({
                 status: true,
                 message: "Call scheduled successfully.",
@@ -873,6 +876,7 @@ const saveCallScheduling = (req, res) => {
             });
           });
         } else {
+          emitBookingUpdate(bookingId);
           return res.json({
             status: true,
             message: "Call scheduled successfully.",
@@ -1013,6 +1017,7 @@ const updateCallScheduling = (req, res) => {
                   console.log("Reschedule email sent successfully");
                 }
 
+                emitBookingUpdate(bookingId);
                 return res.json({
                   status: true,
                   message: "Call Rescheduled successfully.",
@@ -1308,6 +1313,12 @@ const setAsConverted = (req, res) => {
             const updatedBooking = bookingRows[0];
             const io = getIO();
             io.emit("bookingUpdated", updatedBooking);
+            if (
+              updatedBooking.fld_call_request_id &&
+              updatedBooking.fld_rc_call_request_id
+            ) {
+              emitRcBookingUpdate(updatedBooking.fld_call_request_id);
+            }
 
             return res.json({
               status: true,
@@ -1395,8 +1406,15 @@ const updateStatusByCrm = (req, res) => {
             }
 
             const updatedBooking = bookingRows[0];
+
             const io = getIO();
             io.emit("bookingUpdated", updatedBooking);
+            if (
+              updatedBooking.fld_call_request_id &&
+              updatedBooking.fld_rc_call_request_id
+            ) {
+              emitRcBookingUpdate(updatedBooking.fld_call_request_id);
+            }
 
             return res.json({
               status: true,
@@ -1594,6 +1612,12 @@ function sendConfirmationEmail(booking, res) {
             const updatedBooking = bookingRows[0];
             const io = getIO();
             io.emit("bookingUpdated", updatedBooking);
+            if (
+              updatedBooking.fld_call_request_id &&
+              updatedBooking.fld_rc_call_request_id
+            ) {
+              emitRcBookingUpdate(updatedBooking.fld_call_request_id);
+            }
           }
           sendFinalResponse2("Call confirmed successfully");
         });
@@ -1703,7 +1727,14 @@ const rescheduleOtherBookings = (req, res) => {
                   updatedBookingRows.length > 0
                 ) {
                   const updatedBooking = updatedBookingRows[0];
+                  const io = getIO();
                   io.emit("bookingUpdated", updatedBooking);
+                  if (
+                    updatedBooking.fld_call_request_id &&
+                    updatedBooking.fld_rc_call_request_id
+                  ) {
+                    emitRcBookingUpdate(updatedBooking.fld_call_request_id);
+                  }
                 }
               });
 
@@ -1990,40 +2021,76 @@ const updateConsultationStatus = async (req, res) => {
     }
 
     // Handle file upload
-    if (req.file && req.file.filename) {
-      try {
-        uploadedFileName = req.file.filename;
-        const fileName = req.file.originalname;
-        const filePath = path.join(__dirname, "../uploads", uploadedFileName);
+    // if (req.file && req.file.filename) {
+    //   try {
+    //     uploadedFileName = req.file.filename;
+    //     const fileName = req.file.originalname;
+    //     const filePath = path.join(__dirname, "../uploads", uploadedFileName);
 
-        const formData = new FormData();
-        formData.append("upload_file", fs.createReadStream(filePath));
-        formData.append("file_name", fileName);
-        formData.append("type", "video");
+    //     const formData = new FormData();
+    //     formData.append("upload_file", fs.createReadStream(filePath));
+    //     formData.append("file_name", fileName);
+    //     formData.append("type", "video");
 
-        const uploadRes = await axios.post(
-          "https://www.rapidcollaborate.com/call_calendar/test/upload_file.php",
-          formData,
-          {
-            headers: formData.getHeaders(),
-          }
-        );
+    //     const uploadRes = await axios.post(
+    //       "https://www.rapidcollaborate.com/call_calendar/test/upload_file.php",
+    //       formData,
+    //       {
+    //         headers: formData.getHeaders(),
+    //       }
+    //     );
 
-        console.log("File upload successful:", uploadRes.data);
+    //     console.log("File upload successful:", uploadRes.data);
 
-        // You can store `uploadRes.data.filename` as public file path if needed
-      } catch (uploadErr) {
-        console.error("File upload failed:", uploadErr.message);
-      }
+    //     // You can store `uploadRes.data.filename` as public file path if needed
+    //   } catch (uploadErr) {
+    //     console.error("File upload failed:", uploadErr.message);
+    //   }
 
-      //delet old file
-      if (old_video_file) {
-        const oldFilePath = path.join("assets/upload_doc/", old_video_file);
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
+    //   //delet old file
+    //   // if (old_video_file) {
+    //   //   const oldFilePath = path.join("assets/upload_doc/", old_video_file);
+    //   //   if (fs.existsSync(oldFilePath)) {
+    //   //     fs.unlinkSync(oldFilePath);
+    //   //   }
+    //   // }
+    // }
+
+    if (req.file && req.file.buffer) {
+    try {
+        // Generate a unique key for Cloudflare R2
+      
+    const key = `completed_file/${bookingid}/${Date.now()}-${req.file.originalname}`;
+    const uploadCommand = new PutObjectCommand({
+        Bucket: "callcalendar",
+        Key: key,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype,
+    });
+    await r2.send(uploadCommand);
+    uploadedFileName = key;
+
+
+
+        // Store in DB
+         // R2 path instead of local filename
+
+        // Optionally delete old file from R2
+        /*
+        if (old_video_file) {
+            const deleteCommand = new DeleteObjectCommand({
+                Bucket: "looppanel",
+                Key: old_video_file
+            });
+            await r2.send(deleteCommand);
         }
-      }
+        */
+
+    } catch (err) {
+        console.error("File upload failed to R2:", err.message);
     }
+}
+
 
     // Get booking details first
     bookingModel.getBookingRowById(bookingid, (err, booking) => {
@@ -2129,7 +2196,7 @@ const updateConsultationStatus = async (req, res) => {
         };
 
         if (uploadedFileName) {
-          historyData.fld_booking_call_file = uploadedFileName;
+          historyData.fld_booking_call_file = "https://pub-9e4af7c90ef24cc7a8ef6102f535e0d2.r2.dev/"+uploadedFileName;
         }
 
         bookingModel.insertBookingStatusHistory(historyData, (historyErr) => {
@@ -3188,9 +3255,29 @@ function emitBookingUpdate(bookingId) {
     if (!err && bookingRows && bookingRows.length > 0) {
       const updatedBooking = bookingRows[0];
       const io = getIO();
+
       io.emit("bookingUpdated", updatedBooking);
+
+      if (
+        updatedBooking.fld_call_request_id &&
+        updatedBooking.fld_rc_call_request_id
+      ) {
+        emitRcBookingUpdate(updatedBooking.fld_call_request_id);
+      }
     }
   });
+}
+
+function emitRcBookingUpdate(callRequestId) {
+  bookingModel.getRcCallBookingRequestById(
+    callRequestId,
+    (err, rcBookingRow) => {
+      if (!err && rcBookingRow) {
+        const io = getIO();
+        io.emit("rcBookingUpdated", rcBookingRow);
+      }
+    }
+  );
 }
 
 module.exports = {
