@@ -1,31 +1,24 @@
-const mysql = require('mysql2/promise');
+var mysql = require('mysql');
 
-const pool = mysql.createPool({
-  host: '50.87.148.156',
-  user: 'rapidcol_rc_main',
-  password: 'rc_main#123',
-  database: 'rapidcol_rc_main',
-  waitForConnections: true,
-  connectionLimit: 2,
-  queueLimit: 0,
-  connectTimeout: 60000,
-  charset: 'utf8mb4',
-  ssl: false,
-  enableKeepAlive: true,      // keeps connection alive
-  keepAliveInitialDelay: 0
+var connection = mysql.createPool({
+    connectionLimit: 20,
+    host: '50.87.148.156',
+    user: 'rapidcol_rc_main',
+    password: 'rc_main#123',
+    database: 'rapidcol_rc_main',
+    charset: 'utf8mb4',
+    connectTimeout: 60000, 
+    timezone: 'Asia/Kolkata',
 });
 
-
-async function testConnection() {
-  try {
-    const conn = await pool.getConnection();
+// Helper to get a connection and execute a query
+connection.getConnection((err, connection) => {
+    if (err) {
+        console.error('Error connecting to the database:', err);
+        process.exit(1);
+    }
     console.log('Connected to Rc database');
-    conn.release();
-  } catch (err) {
-    console.error('Error connecting to the database:', err);
-  }
-}
+    connection.release(); 
+});
 
-testConnection();
-
-module.exports = pool;
+module.exports = connection; 
