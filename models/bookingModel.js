@@ -1,8 +1,8 @@
 const db = require("../config/db");
 const instacrm_db = require("../config/instacrm_db");
-const rc_db = require("../config/rc_db");
+// const rc_db = require("../config/rc_db");
 const moment = require('moment');
-
+const axios = require("axios");
 
 const getBookings = (userId, userType, assigned_team, filters, dashboard_status, callback) => {
   const currentDate = moment();
@@ -271,94 +271,94 @@ const getPresaleClientDetails = (client_id, callback) => {
 };
 
 
-const getPostsaleClientDetails = (client_id, callback) => {
-  rc_db.getConnection((err, connection) => {
-    if (err) return callback(err);
+// const getPostsaleClientDetails = (client_id, callback) => {
+//   rc_db.getConnection((err, connection) => {
+//     if (err) return callback(err);
 
-    const studentSQL = `
-      SELECT 
-        st_id,
-        st_name AS name,
-        st_email AS email,
-        contact_no AS phone,
-        address1
-      FROM tbl_scholar 
-      WHERE student_code = ? 
-      LIMIT 1
-    `;
+//     const studentSQL = `
+//       SELECT 
+//         st_id,
+//         st_name AS name,
+//         st_email AS email,
+//         contact_no AS phone,
+//         address1
+//       FROM tbl_scholar 
+//       WHERE student_code = ? 
+//       LIMIT 1
+//     `;
 
-    connection.query(studentSQL, [client_id], (err, studentResult) => {
-      if (err) {
-        connection.release();
-        return callback(err);
-      }
+//     connection.query(studentSQL, [client_id], (err, studentResult) => {
+//       if (err) {
+//         connection.release();
+//         return callback(err);
+//       }
 
-      if (!studentResult || studentResult.length === 0) {
-        connection.release();
-        return callback(null, null);
-      }
+//       if (!studentResult || studentResult.length === 0) {
+//         connection.release();
+//         return callback(null, null);
+//       }
 
-      const student = studentResult[0];
-      const st_id = student.st_id;
+//       const student = studentResult[0];
+//       const st_id = student.st_id;
 
-      const projectSQL = `SELECT id, project_title FROM tbl_project WHERE student_id = ?`;
+//       const projectSQL = `SELECT id, project_title FROM tbl_project WHERE student_id = ?`;
 
-      connection.query(projectSQL, [st_id], (err2, projectResults) => {
-        if (err2) {
-          connection.release();
-          return callback(err2);
-        }
+//       connection.query(projectSQL, [st_id], (err2, projectResults) => {
+//         if (err2) {
+//           connection.release();
+//           return callback(err2);
+//         }
 
-        const planSQL = `
-          SELECT plan_type 
-          FROM tbl_clients_plan_upgrade 
-          WHERE client_id = ? AND status = 2 
-          ORDER BY id DESC 
-          LIMIT 1
-        `;
+//         const planSQL = `
+//           SELECT plan_type 
+//           FROM tbl_clients_plan_upgrade 
+//           WHERE client_id = ? AND status = 2 
+//           ORDER BY id DESC 
+//           LIMIT 1
+//         `;
 
-        connection.query(planSQL, [st_id], (err3, planResult) => {
-          connection.release();
+//         connection.query(planSQL, [st_id], (err3, planResult) => {
+//           connection.release();
 
-          if (err3) return callback(err3);
+//           if (err3) return callback(err3);
 
-          const plan_type = (planResult && planResult.length > 0) ? planResult[0].plan_type : null;
+//           const plan_type = (planResult && planResult.length > 0) ? planResult[0].plan_type : null;
 
-          const response = {
-            name: student.name,
-            email: student.email,
-            phone: student.phone,
-            projects: projectResults || [],
-            plan_type: plan_type,
-          };
+//           const response = {
+//             name: student.name,
+//             email: student.email,
+//             phone: student.phone,
+//             projects: projectResults || [],
+//             plan_type: plan_type,
+//           };
 
-          return callback(null, response);
-        });
-      });
-    });
-  });
-};
+//           return callback(null, response);
+//         });
+//       });
+//     });
+//   });
+// };
 
 
 
-const getProjectMilestones = (projectId, callback) => {
-  const sql = `
-    SELECT id, segment_title 
-    FROM tbl_segment 
-    WHERE project_id = ?
-    ORDER BY segment_date ASC
-  `;
+// const getProjectMilestones = (projectId, callback) => {
+//   const sql = `
+//     SELECT id, segment_title 
+//     FROM tbl_segment 
+//     WHERE project_id = ?
+//     ORDER BY segment_date ASC
+//   `;
 
-  rc_db.getConnection((err, connection) => {
-    if (err) return callback(err);
+//   rc_db.getConnection((err, connection) => {
+//     if (err) return callback(err);
 
-    connection.query(sql, [projectId], (queryErr, results) => {
-      connection.release();
-      if (queryErr) return callback(queryErr);
-      return callback(null, results);
-    });
-  });
-};
+//     connection.query(sql, [projectId], (queryErr, results) => {
+//       connection.release();
+//       if (queryErr) return callback(queryErr);
+//       return callback(null, results);
+//     });
+//   });
+// };
 
 
 const checkCallrecording = (email, ref_id, callback) => {
@@ -926,6 +926,7 @@ const insertUser = (data, email, name, verifyCode, callback) => {
 
 
 
+
 const updateRcCallRequestSts = (callRequestId, rcCallRequestId, status, callback = () => {}) => {
   if (!callRequestId || !rcCallRequestId || !status) {
     return callback(null, false);
@@ -937,44 +938,36 @@ const updateRcCallRequestSts = (callRequestId, rcCallRequestId, status, callback
       return callback(mainErr, null);
     }
 
-    rc_db.getConnection((rcErr, rcConn) => {
-      if (rcErr) {
-        console.error("RC DB connection error:", rcErr);
+    mainConn.query(
+      `UPDATE tbl_rc_call_booking_request SET call_request_sts = ? WHERE id = ?`,
+      [status, callRequestId],
+      async (mainQueryErr) => {
         mainConn.release();
-        return callback(rcErr, null);
-      }
 
-      mainConn.query(
-        `UPDATE tbl_rc_call_booking_request SET call_request_sts = ? WHERE id = ?`,
-        [status, callRequestId],
-        (mainQueryErr) => {
-          if (mainQueryErr) {
-            console.error("Main DB update error:", mainQueryErr);
-            mainConn.release();
-            rcConn.release();
-            return callback(mainQueryErr, null);
-          }
-
-          rcConn.query(
-            `UPDATE tbl_call_booking_request SET status = ? WHERE id = ?`,
-            [status, rcCallRequestId],
-            (rcQueryErr) => {
-              mainConn.release();
-              rcConn.release();
-
-              if (rcQueryErr) {
-                console.error("RC DB update error:", rcQueryErr);
-                return callback(rcQueryErr, null);
-              }
-
-              return callback(null, true);
-            }
-          );
+        if (mainQueryErr) {
+          console.error("Main DB update error:", mainQueryErr);
+          return callback(mainQueryErr, null);
         }
-      );
-    });
+
+        try {
+          // Call Zend API for RC DB update
+          await axios.get(`https://rapidcollaborate.com/rc-main/cron/index/updaterccallrequest`, {
+            params: {
+              rc_call_request_id: rcCallRequestId,
+              status
+            }
+          });
+
+          return callback(null, true);
+        } catch (apiErr) {
+          console.error("Zend API call error:", apiErr);
+          return callback(apiErr, null);
+        }
+      }
+    );
   });
 };
+
 
 const getRcCallBookingRequestById = (id, callback) => {
   if (!id || Number(id) <= 0) {
@@ -2011,8 +2004,8 @@ module.exports = {
   getBookings,
   getBookingHistory,
   getPresaleClientDetails,
-  getPostsaleClientDetails,
-  getProjectMilestones,
+  // getPostsaleClientDetails,
+  // getProjectMilestones,
   checkCallrecording,
   checkConsultantClientWebsite,
   checkConsultantCompletedCall,

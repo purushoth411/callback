@@ -1192,7 +1192,7 @@ const validateOtp = (req, res) => {
                                 fld_comment: `Call cancelled and to be rescheduled as client did not confirm on ${currentDateRes} at ${currentTimeRes}`,
                                 fld_notif_for: "EXECUTIVE",
                                 fld_notif_for_id: row.fld_addedby,
-                                fld_addedon: new Date(),
+                                fld_addedon: moment().toDate(),
                               },
                               () => {}
                             );

@@ -324,9 +324,10 @@ const insertCallRequest = (req, res) => {
       user,
     } = req.body;
 
-    const formatted_booking_date = booking_date
-      ? new Date(booking_date).toISOString().split("T")[0]
-      : null;
+   const formatted_booking_date = booking_date
+    ? moment(booking_date).format("YYYY-MM-DD")
+    : null;
+
     let question_data_string =
       Array.isArray(question_data) && question_data.length > 0
         ? question_data.join("~~")
@@ -733,8 +734,9 @@ function generateRandomPassword() {
 }
 
 function generateUserCode() {
-  return "USER" + Date.now();
+  return "USER" + moment().format("YYYYMMDDHHmmss");
 }
+
 
 function getFormattedDate() {
   return moment().format("DD-MMM-YYYY"); // e.g., 13-Aug-2025
@@ -1547,7 +1549,7 @@ const markAsConfirmByClient = (req, res) => {
         fld_comment: comment,
         fld_notif_for: "EXECUTIVE",
         fld_notif_for_id: booking.fld_addedby,
-        fld_addedon: new Date(),
+       fld_addedon: moment().toDate()
       };
 
       bookingModel.insertBookingHistory(historyData, (historyErr) => {
@@ -1709,7 +1711,7 @@ const rescheduleOtherBookings = (req, res) => {
               fld_comment: comment,
               fld_notif_for: "EXECUTIVE",
               fld_notif_for_id: row.fld_addedby,
-              fld_addedon: new Date(),
+              fld_addedon: moment().toDate(),
             };
 
             bookingModel.insertBookingHistory(historyData, (historyErr) => {
@@ -1782,7 +1784,7 @@ const reassignComment = (req, res) => {
           fld_comment: comment,
           fld_notif_for: "SUPERADMIN",
           fld_notif_for_id: 1,
-          fld_addedon: new Date(),
+          fld_addedon: moment().toDate(),
         };
 
         bookingModel.insertBookingHistory(historyData, (historyErr) => {
@@ -2609,7 +2611,7 @@ const assignExternalCall = (req, res) => {
         fld_call_added_by: callAddedBy,
         fld_consultation_sts: "Pending",
         fld_call_request_sts: "Pending",
-        fld_added_on: new Date(),
+        fld_added_on: moment().toDate(),
       };
 
       bookingModel.insertExternalCall(externalCallData, (err, insertedId) => {
@@ -2641,7 +2643,7 @@ const assignExternalCall = (req, res) => {
             fld_comment: comment,
             fld_notif_for: admin.fld_admin_type,
             fld_notif_for_id: process.env.DEFAULT_EXTERNAL_ASSIGN_ID || 0,
-            fld_addedon: new Date(),
+            fld_addedon:moment().toDate(),
           };
 
           bookingModel.insertBookingHistory(historyData, (err, historyId) => {

@@ -1,19 +1,18 @@
 var mysql = require('mysql');
 
 var connection = mysql.createPool({
-    connectionLimit: 20,
+    connectionLimit: 200,
     // host: 'localhost',
     // user: 'root',
     // password: '',
     // database: 'call_calendar',
-    host: '50.87.148.156',
-    user: 'rapidcol_call_ca',
-    password: 'nv0@Fg)^ZcvW',
-    database: 'rapidcol_call_calendar_test',
+    host: '162.241.126.79',
+    user: 'callcalendaruser',
+    password: '92oBlu9@',
+    database: 'call_calendardb',
     charset: 'utf8mb4',
-    connectTimeout: 60000, 
+    connectTimeout: 30000, 
     timezone: 'Asia/Kolkata',
-    ssl: { rejectUnauthorized: false } 
 });
 
 // Helper to get a connection and execute a query
