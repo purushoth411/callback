@@ -23,6 +23,7 @@
     "moment-timezone": "^0.6.0",
     "multer": "^2.0.2",
     "mysql": "^2.18.1",
+    "mysql2": "^3.14.3",
     "path": "^0.12.7",
     "postmark": "^4.0.5",
     "socket.io": "^4.8.1",
