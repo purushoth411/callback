@@ -6,12 +6,15 @@ const pool = mysql.createPool({
   password: 'rc_main#123',
   database: 'rapidcol_rc_main',
   waitForConnections: true,
-  connectionLimit: 5,
+  connectionLimit: 2,
   queueLimit: 0,
-  connectTimeout: 60000, // 60 seconds
+  connectTimeout: 60000,
   charset: 'utf8mb4',
-  ssl: false // if your DB doesn’t require SSL
+  ssl: false,
+  enableKeepAlive: true,      // keeps connection alive
+  keepAliveInitialDelay: 0
 });
+
 
 async function testConnection() {
   try {
