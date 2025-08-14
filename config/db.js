@@ -13,6 +13,7 @@ var connection = mysql.createPool({
     charset: 'utf8mb4',
     connectTimeout: 60000, 
     timezone: 'Asia/Kolkata',
+    ssl: { rejectUnauthorized: false } 
 });
 
 // Helper to get a connection and execute a query
