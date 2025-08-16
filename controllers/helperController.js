@@ -1023,15 +1023,15 @@ const verifyOtpUrl = (req, res) => {
             Thanks & Regards,<br/> ${process.env.WEBNAME}
           `;
 
-        sendPostmarkMail(
-          {
-            from: process.env.FROM_EMAIL,
-            to: email,
-            subject,
-            body,
-          },
-          () => {}
-        );
+        // // sendPostmarkMail(
+        // //   {
+        // //     from: process.env.FROM_EMAIL,
+        // //     to: email,
+        // //     subject,
+        // //     body,
+        // //   },
+        //   () => {}
+        // );
       });
     }
 

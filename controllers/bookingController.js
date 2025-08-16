@@ -578,7 +578,7 @@ const insertCallRequest = (req, res) => {
                     // STEP 11: Booking history for consultants
                     if (consultant_id) {
                       bookingModel.getAdminById(
-                        consultantId,
+                        consultant_id,
                         (err, consultantInfo) => {
                           if (err) {
                             console.error(
@@ -786,6 +786,7 @@ const saveCallScheduling = (req, res) => {
     timezone,
     callLink,
     secondaryConsultantId,
+    user
   } = req.body;
 
   if (!bookingId || !consultantId || !bookingDate || !slot) {
@@ -811,83 +812,158 @@ const saveCallScheduling = (req, res) => {
     if (err)
       return res.json({ status: false, message: "Failed to update booking." });
 
-    // Step 2: Get Consultant Info
-    helperModel.getAdminById(consultantId, (err, admin) => {
-      if (err || !admin)
-        return res.json({ status: false, message: "Consultant not found." });
+    // Step 2: Get Booking Info for Email
+   
+    bookingModel.getBookingById(bookingId, (err, bookingRows) => {
+    if (err || !bookingRows || bookingRows.length === 0) {
+      return res.json({
+        status: false,
+        message: "Failed to fetch existing booking data.",
+      });
+    }
 
-      const comment = `Call scheduled by ${admin.fld_name} on ${moment().format(
-        "DD MMM YYYY"
-      )} at ${moment().format("hh:mm a")}`;
+    const bookingInfo = bookingRows[0];
 
-      const historyData = {
-        fld_booking_id: bookingId,
-        fld_comment: comment,
-        fld_notif_for: admin.fld_admin_type,
-        fld_notif_for_id: consultantId,
-        fld_addedon: moment().format("YYYY-MM-DD"),
-      };
+      // Step 3: Get Consultant Info
+      helperModel.getAdminById(consultantId, (err, admin) => {
+        if (err || !admin)
+          return res.json({ status: false, message: "Consultant not found." });
 
-      // Step 3: Insert Primary Consultant History
-      bookingModel.insertBookingHistory(historyData, (err) => {
-        if (err)
-          return res.json({
-            status: false,
-            message: "Failed to insert history log.",
-          });
+        const comment = `Call scheduled for consultant ${admin.fld_name} by ${user?.fld_name} on ${moment().format(
+          "DD MMM YYYY"
+        )} at ${moment().format("hh:mm a")}`;
 
-        // Step 4: Secondary Consultant (if passed)
-        if (secondaryConsultantId) {
-          helperModel.getAdminById(secondaryConsultantId, (err, secAdmin) => {
-            if (err || !secAdmin) {
-              return res.json({
-                status: true,
-                message:
-                  "Call scheduled, but failed to load secondary consultant.",
-              });
-            }
+        const historyData = {
+          fld_booking_id: bookingId,
+          fld_comment: comment,
+          fld_notif_for: admin.fld_admin_type,
+          fld_notif_for_id: consultantId,
+          fld_addedon: moment().format("YYYY-MM-DD"),
+        };
 
-            const secComment = `Call scheduled by ${
-              admin.fld_name
-            } for secondary consultant on ${moment().format(
-              "DD MMM YYYY"
-            )} at ${moment().format("hh:mm a")}`;
+        // Step 4: Insert Primary Consultant History
+        bookingModel.insertBookingHistory(historyData, (err) => {
+          if (err)
+            return res.json({
+              status: false,
+              message: "Failed to insert history log.",
+            });
 
-            const secHistory = {
-              fld_booking_id: bookingId,
-              fld_comment: secComment,
-              fld_notif_for: secAdmin.fld_admin_type,
-              fld_notif_for_id: consultantId, // still notifying primary consultant?
-              fld_addedon: moment().format("YYYY-MM-DD"),
+          // Step 5: Handle Email Sending (if email exists and not direct call)
+          const shouldSendEmail = bookingInfo.fld_email && 
+                                bookingInfo.fld_email !== "" && 
+                                bookingInfo.fld_call_related_to !== "direct_call";
+
+          if (shouldSendEmail) {
+            // Generate OTP and update booking
+            const verify_otp_url = Math.floor(Math.random() * (999999 - 111111 + 1)) + 111111;
+            
+            const otpData = {
+              fld_call_confirmation_status: 'Call Confirmation Pending at Client End',
+              fld_verify_otp_url: verify_otp_url
             };
 
-            bookingModel.insertBookingHistory(secHistory, (err) => {
+            bookingModel.updateBooking(bookingId, otpData, (err) => {
               if (err) {
-                emitBookingUpdate(bookingId);
-                return res.json({
-                  status: true,
-                  message:
-                    "Call scheduled, but failed to log secondary consultant history.",
-                });
+                console.error("Failed to update booking with OTP:", err);
               }
+
+              // Prepare email content
+              const otpPage = `${process.env.BASE_URL}/otp/${bookingInfo.id}/${verify_otp_url}`;
+              const subject = `Booking Information ${bookingInfo.fld_bookingcode} - ${process.env.WEBNAME }`;
+              
+              const body = `Hi ${bookingInfo.fld_name}, <br/><br/> 
+                Your call is scheduled with one of the experts to discuss about your research work. 
+                Please click on the button below to view the booking details<br/><br/>
+                <a href="${otpPage}" style='color: #fff;background-color: #fa713b;border-radius:5px;padding:10px 15px;' target='_blank'>View Booking Details</a><br/>
+                <br/>Thanks & Regards,<br /> Team - ${process.env.WEBNAME }`;
+
+          
+              
+                sendPostmarkMail(
+                  {
+                    from: process.env.FROM_EMAIL,
+                    to: bookingInfo.fld_email,
+                    bcc: "",
+                    subject: subject,
+                    body: body,
+                  },
+                  (emailErr, emailResult) => {
+                    if (emailErr) {
+                      console.error("Failed to send email:", emailErr);
+                    } else {
+                      console.log("Email sent successfully:", emailResult);
+                    }
+                  }
+                );
+              
+
+              // Continue with secondary consultant logic
+              handleSecondaryConsultant();
+            });
+          } else {
+            // No email to send, continue with secondary consultant logic
+            handleSecondaryConsultant();
+          }
+
+          // Step 6: Secondary Consultant Handler
+          function handleSecondaryConsultant() {
+            if (secondaryConsultantId) {
+              helperModel.getAdminById(secondaryConsultantId, (err, secAdmin) => {
+                if (err || !secAdmin) {
+                  emitBookingUpdate(bookingId);
+                  return res.json({
+                    status: true,
+                    message: "Call scheduled, but failed to load secondary consultant.",
+                  });
+                }
+
+                const secComment = `Call scheduled by ${
+                  admin.fld_name
+                } for secondary consultant on ${moment().format(
+                  "DD MMM YYYY"
+                )} at ${moment().format("hh:mm a")}`;
+
+                const secHistory = {
+                  fld_booking_id: bookingId,
+                  fld_comment: secComment,
+                  fld_notif_for: secAdmin.fld_admin_type,
+                  fld_notif_for_id: secondaryConsultantId, // Fixed: should be secondaryConsultantId
+                  fld_addedon: moment().format("YYYY-MM-DD"),
+                };
+
+                bookingModel.insertBookingHistory(secHistory, (err) => {
+                  emitBookingUpdate(bookingId);
+                  
+                  if (err) {
+                    return res.json({
+                      status: true,
+                      message: "Call scheduled, but failed to log secondary consultant history.",
+                    });
+                  }
+                  
+                  return res.json({
+                    status: true,
+                    message: "Call scheduled successfully.",
+                  });
+                });
+              });
+            } else {
               emitBookingUpdate(bookingId);
+              
               return res.json({
                 status: true,
                 message: "Call scheduled successfully.",
               });
-            });
-          });
-        } else {
-          emitBookingUpdate(bookingId);
-          return res.json({
-            status: true,
-            message: "Call scheduled successfully.",
-          });
-        }
+            }
+          }
+        });
       });
     });
   });
 };
+
+
 
 const updateCallScheduling = (req, res) => {
   const {
@@ -2122,7 +2198,7 @@ const updateConsultationStatus = async (req, res) => {
         // Clear verify_otp_url for rescheduled bookings
         bookingModel.updateBooking(
           bookingid,
-          { fld_verify_otp_url: NULL },
+          { fld_verify_otp_url: null },
           (err) => {
             if (err) {
               console.error("Error clearing verify_otp_url:", err);
