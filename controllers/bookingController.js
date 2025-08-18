@@ -604,7 +604,7 @@ const insertCallRequest = (req, res) => {
 
                           const history1 = {
                             fld_booking_id: bookingId,
-                            fld_comment: comment1,
+                            fld_comment: comment,
                             fld_notif_for: "EXECUTIVE",
                             fld_notif_for_id: user?.fld_admin_id || adminId,
                             fld_addedon: moment().format("YYYY-MM-DD"),

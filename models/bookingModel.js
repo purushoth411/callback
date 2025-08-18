@@ -13,10 +13,7 @@ const getBookings = (
   callback
 ) => {
   const currentDate = moment();
-  const twoDaysBefore = currentDate
-    .clone()
-    .subtract(2, "days")
-    .format("YYYY-MM-DD");
+  const twoDaysBefore = currentDate.clone().subtract(2, "days").format("YYYY-MM-DD");
   const twoDaysAfter = currentDate.clone().add(2, "days").format("YYYY-MM-DD");
 
   let sql = `
@@ -41,19 +38,11 @@ const getBookings = (
 
   const params = [];
 
+  // -------------------------
+  // Build Filters
+  // -------------------------
   const buildFilters = () => {
-    // if (Array.isArray(filters.consultationStatus) && filters.consultationStatus.length > 0) {
-    //   const placeholders = filters.consultationStatus.map(() => "?").join(",");
-    //   sql += ` AND b.fld_consultation_sts IN (${placeholders})`;
-    //   params.push(...filters.consultationStatus);
-    // } else if (filters.consultationStatus) {
-    //   sql += ` AND b.fld_consultation_sts = ?`;
-    //   params.push(filters.consultationStatus);
-    // }
-    if (
-      Array.isArray(filters.consultationStatus) &&
-      filters.consultationStatus.length > 0
-    ) {
+    if (Array.isArray(filters.consultationStatus) && filters.consultationStatus.length > 0) {
       const placeholders = filters.consultationStatus.map(() => "?").join(",");
       sql += ` AND b.fld_call_request_sts IN (${placeholders})`;
       params.push(...filters.consultationStatus);
@@ -87,25 +76,39 @@ const getBookings = (
       params.push(`%${filters.search}%`, `%${filters.search}%`);
     }
 
-    if (filters.fromDate && filters.toDate) {
+   if (filters.fromDate && filters.toDate) {
+  const today = moment().format("YYYY-MM-DD");
+  const last7DaysStart = moment().subtract(7, "days").format("YYYY-MM-DD");
+
+  if (
+    userType === "EXECUTIVE" &&
+    filters.filter_type === "Booking" &&
+    filters.fromDate === last7DaysStart &&
+    filters.toDate === today
+  ) {
+    // For executive: last 7 days booking date + today's created rows
+    sql += ` AND (
+               DATE(b.fld_booking_date) BETWEEN ? AND ?
+               OR DATE(b.fld_addedon) = ?
+             )`;
+    params.push(filters.fromDate, filters.toDate, today);
+  } else {
+    // Normal filter
+    const dateField =
+      filters.filter_type === "Created"
+        ? "b.fld_addedon"
+        : "b.fld_booking_date";
+    sql += ` AND DATE(${dateField}) BETWEEN ? AND ?`;
+    params.push(filters.fromDate, filters.toDate);
+  }
+}else if (filters.fromDate) {
       const dateField =
-        filters.filter_type === "Created"
-          ? "b.fld_addedon"
-          : "b.fld_booking_date";
-      sql += ` AND DATE(${dateField}) BETWEEN ? AND ?`;
-      params.push(filters.fromDate, filters.toDate);
-    } else if (filters.fromDate) {
-      const dateField =
-        filters.filter_type === "Created"
-          ? "b.fld_addedon"
-          : "b.fld_booking_date";
+        filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
       sql += ` AND DATE(${dateField}) >= ?`;
       params.push(filters.fromDate);
     } else if (filters.toDate) {
       const dateField =
-        filters.filter_type === "Created"
-          ? "b.fld_addedon"
-          : "b.fld_booking_date";
+        filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
       sql += ` AND DATE(${dateField}) <= ?`;
       params.push(filters.toDate);
     }
@@ -118,8 +121,13 @@ const getBookings = (
       sql += ` AND b.fld_booking_date BETWEEN ? AND ?`;
       params.push(twoDaysBefore, twoDaysAfter);
     }
+  };
 
-    sql += `
+  // -------------------------
+  // ORDER BY logic
+  // -------------------------
+  const getOrderByClause = () => {
+    let orderBy = `
       ORDER BY 
         CASE 
           WHEN DATE(b.fld_booking_date) = CURDATE() THEN 1 
@@ -132,47 +140,43 @@ const getBookings = (
         b.fld_booking_slot ASC
       LIMIT 500
     `;
+
+    // EXECUTIVE + last 7 days → prioritize today's addedon
+    if (userType === "EXECUTIVE" && filters.fromDate && filters.toDate) {
+      const today = moment().format("YYYY-MM-DD");
+      const last7DaysStart = moment().subtract(7, "days").format("YYYY-MM-DD");
+      if (filters.fromDate === last7DaysStart && filters.toDate === today) {
+        orderBy = `
+          ORDER BY
+            CASE 
+              WHEN DATE(b.fld_addedon) = CURDATE() THEN 1
+              ELSE 2
+            END ASC,
+            b.fld_addedon DESC,
+            CASE 
+              WHEN DATE(b.fld_booking_date) = CURDATE() THEN 1 
+              WHEN DATE(b.fld_booking_date) > CURDATE() THEN 2 
+              ELSE 3 
+            END ASC,
+            CASE 
+              WHEN DATE(b.fld_booking_date) < CURDATE() THEN b.fld_booking_date
+            END DESC,
+            b.fld_booking_slot ASC
+          LIMIT 500
+        `;
+      }
+    }
+
+    return orderBy;
   };
 
+  // -------------------------
+  // Execute query
+  // -------------------------
   const executeQuery = (conn) => {
     buildFilters();
-    conn.query(sql, params, (err, results) => {
-      conn.release(); // 🔓 always release the connection
-      if (err) return callback(err);
-      callback(null, results);
-    });
-  };
+    sql += getOrderByClause();
 
-  const executeQueryForExecutive = (conn) => {
-    buildFilters();
-    
-    // Check if this is last 7 days filter for EXECUTIVE
-    const today = moment().format("YYYY-MM-DD");
-    const last7DaysStart = moment().subtract(6, "days").format("YYYY-MM-DD");
-    
-    const isLast7Days = filters.fromDate === last7DaysStart && filters.toDate === today;
-    
-    if (isLast7Days) {
-      // Override the default ordering to prioritize today's created calls
-      // Remove the default ORDER BY clause
-      const orderByIndex = sql.lastIndexOf('ORDER BY');
-      if (orderByIndex !== -1) {
-        sql = sql.substring(0, orderByIndex);
-      }
-      
-      // Add special ordering for EXECUTIVE last 7 days case
-      sql += `
-        ORDER BY 
-          CASE 
-            WHEN DATE(b.fld_addedon) = CURDATE() THEN 1 
-            ELSE 2 
-          END ASC,
-          b.fld_addedon DESC,
-          b.fld_booking_slot ASC
-        LIMIT 500
-      `;
-    }
-    
     conn.query(sql, params, (err, results) => {
       conn.release();
       if (err) return callback(err);
@@ -180,17 +184,16 @@ const getBookings = (
     });
   };
 
-
+  // -------------------------
+  // Role Handling
+  // -------------------------
   db.getConnection((err, connection) => {
     if (err) return callback(err);
 
     if (userType === "SUPERADMIN") {
       executeQuery(connection);
     } else if (userType === "SUBADMIN" && assigned_team) {
-      const teamIds = assigned_team
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean);
+      const teamIds = assigned_team.split(",").map((id) => id.trim()).filter(Boolean);
 
       if (teamIds.length > 0) {
         const placeholders = teamIds.map(() => "?").join(",");
@@ -205,9 +208,7 @@ const getBookings = (
           let teamUserIds = [];
           rows.forEach((row) => {
             if (row.team_members) {
-              teamUserIds.push(
-                ...row.team_members.split(",").map((id) => id.trim())
-              );
+              teamUserIds.push(...row.team_members.split(",").map((id) => id.trim()));
             }
           });
 
@@ -228,27 +229,13 @@ const getBookings = (
         params.push(userId, userId);
         executeQuery(connection);
       }
-    }  else if (userType === "CONSULTANT") {
-    sql += ` AND b.fld_consultantid = ? AND b.fld_call_request_sts != "Consultant Assigned"`;
-    params.push(userId);
-    executeQuery(connection);
-  } else if (userType === "EXECUTIVE") {
-   
+    } else if (userType === "CONSULTANT") {
+      sql += ` AND b.fld_consultantid = ? AND b.fld_call_request_sts != "Consultant Assigned"`;
+      params.push(userId);
+      executeQuery(connection);
+    } else if (userType === "EXECUTIVE") {
       sql += ` AND b.fld_addedby = ?`;
       params.push(userId);
-
-       if (filters.fromDate && filters.toDate) {
-    const today = moment().format("YYYY-MM-DD");
-    const last7DaysStart = moment().subtract(6, "days").format("YYYY-MM-DD"); // last 7 days including today
-
-    if (
-      filters.fromDate === last7DaysStart &&
-      filters.toDate === today
-    ) {
-      sql += ` AND (DATE(b.fld_addedon) BETWEEN ? AND ? OR DATE(b.fld_addedon) = ?)`;
-      params.push(filters.fromDate, filters.toDate, today);
-    }
-  }
       executeQuery(connection);
     } else {
       sql += ` AND 1 = 0`; // fallback - no access
@@ -256,6 +243,7 @@ const getBookings = (
     }
   });
 };
+
 
 const getBookingHistory = (bookingId, callback) => {
   const sql = `
@@ -272,7 +260,7 @@ const getBookingHistory = (bookingId, callback) => {
       crmIdsNotifi
     FROM tbl_booking_overall_history
     WHERE fld_booking_id = ?
-    ORDER BY fld_addedon DESC
+    ORDER BY id DESC
   `;
 
   db.getConnection((err, connection) => {
