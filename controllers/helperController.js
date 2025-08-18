@@ -6,6 +6,14 @@ const moment = require("moment");
 const { getIO, getConnectedUsers } = require("../socket");
 const sendPostmarkMail = require("../sendPostmarkMail");
 
+function getFormattedDate() {
+  return moment().format("DD-MMM-YYYY"); // e.g., 13-Aug-2025
+}
+
+function getFormattedTime() {
+  return moment().format("hh:mm A"); // e.g., 10:45 AM
+}
+
 const getAllActiveTeams = (req, res) => {
   helperModel.getAllActiveTeams((err, teams) => {
     if (err) {
@@ -787,7 +795,7 @@ const addFollower = (req, res) => {
 
           const commentDate = moment().format("D MMM YYYY");
           const commentTime = moment().format("h:mm a");
-          const comment = `${user.fld_admin_type} ${user.fld_name} added ${followerConsultantName} as a follower on ${commentDate} at ${commentTime}`;
+          const comment = `${user.fld_admin_type} ${user.fld_name} added ${followerConsultantName} as a follower  on ${getFormattedDate()} at ${getFormattedTime()}`;
 
           const historyData = {
             fld_booking_id: bookingid,
@@ -862,7 +870,7 @@ const updateExternalBookingInfo = (req, res) => {
       const adminName = user.fld_name || "Unknown Admin";
       const commentDate = moment().format("D MMM YYYY");
       const commentTime = moment().format("h:mm a");
-      const comment = `External Call Booking Info Updated by CRM ${adminName} on ${commentDate} at ${commentTime}`;
+      const comment = `External Call Booking Info Updated by CRM ${adminName}  on ${getFormattedDate()} at ${getFormattedTime()}`;
 
       const historyData = {
         fld_booking_id: bookingid,
@@ -1101,7 +1109,7 @@ const validateOtp = (req, res) => {
         // Insert booking history
         const currentDate = moment().format("D MMM YYYY");
         const currentTime = moment().format("h:mm a");
-        const comment = `Call validated by client on ${currentDate} at ${currentTime}`;
+        const comment = `Call validated by client  on ${getFormattedDate()} at ${getFormattedTime()}`;
 
         bookingModel.insertBookingHistory(
           {
@@ -1189,7 +1197,7 @@ const validateOtp = (req, res) => {
                             bookingModel.insertBookingHistory(
                               {
                                 fld_booking_id: row.id,
-                                fld_comment: `Call cancelled and to be rescheduled as client did not confirm on ${currentDateRes} at ${currentTimeRes}`,
+                                fld_comment: `Call cancelled and to be rescheduled as client did not confirm  on ${getFormattedDate()} at ${getFormattedTime()}`,
                                 fld_notif_for: "EXECUTIVE",
                                 fld_notif_for_id: row.fld_addedby,
                                 fld_addedon: moment().toDate(),
