@@ -1,9 +1,13 @@
 // controllers/followerController.js
 const followerModel = require("../models/followerModel");
 const db = require("../config/db");
-const moment =require('moment');
+const moment = require('moment-timezone');
+
 const { getIO } = require("../socket");
 
+function getCurrentDate(format = "YYYY-MM-DD") {
+  return moment().tz("Asia/Kolkata").format(format);
+}
 const getAllActiveFollowers = (req, res) => {
   followerModel.getAllActiveFollowers((err, Followers) => {
     if (err) {
@@ -52,23 +56,19 @@ const followerclaimbooking = (req, res) => {
 
         if (existingbooking) {
            let bookingTime = moment(`${existingbooking.fld_booking_date} ${existingbooking.fld_booking_slot}`, "YYYY-MM-DD HH:mm");
-let currentTime = moment();
+const currentTime = moment().tz("Asia/Kolkata");
 
+    if (currentTime.isBefore(bookingTime)) {
+      const formattedDate = getCurrentDate("DD-MMM-YYYY"); // e.g., "29-Jul-2025"
+      const formattedTime = getCurrentDate("hh:mm A")
+               const comment = `The call has been successfully claimed by ${userName} on ${formattedDate} at ${formattedTime}`;
 
-            if (currentTime<bookingTime)
-            {
-              const now = moment();
-              const formattedDate = now.format("DD-MMM-YYYY"); // e.g., "29-Jul-2025"
-              const formattedTime = now.format("hh:mm A");
-              const comment = `The call has been successfully claimed by  ${userName} on ${formattedDate} at ${formattedTime}`;
-
-              const historyData = {
-                fld_booking_id: bookingId,
-                fld_comment: comment,
-                fld_notif_view_sts:'READ',
-                fld_addedon: new Date(),
-              };  
-
+      const historyData = {
+        fld_booking_id: bookingId,
+        fld_comment: comment,
+        fld_notif_view_sts: "READ",
+        fld_addedon: getCurrentDate("YYYY-MM-DD HH:mm:ss"), // IST timestamp
+      };
               followerModel.insertBookingHistory(historyData, (err, historyId) => {
               if (err) {
                 console.error("History insert failed:", err);

@@ -1,9 +1,12 @@
 // controllers/dashboardController.js
 const dashboardModel = require("../models/dashboardModel");
 const db = require("../config/db");
-const moment = require('moment');
+const moment = require('moment-timezone');
 
 
+function getCurrentDate(format = "YYYY-MM-DD") {
+  return moment().tz("Asia/Kolkata").format(format);
+}
 const getAllActiveTeams = (req, res) => {
   dashboardModel.getAllActiveTeams((err, teams) => {
     if (err) {
@@ -139,7 +142,7 @@ const saveConsultantSettings = (req, res) => {
     fld_fri_time_data: timeData.fri_time_data ?? null,
     fld_sat_time_data: timeData.sat_time_data ?? null,
 
-    fld_updatedon: moment().format("YYYY-MM-DD HH:mm:ss")
+    fld_updatedon: getCurrentDate("YYYY-MM-DD HH:mm:ss")
   };
 
   dashboardModel.updateConsultantSettings(consultantid, data, (err, result) => {

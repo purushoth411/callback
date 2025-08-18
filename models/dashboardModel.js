@@ -1,6 +1,7 @@
 // models/dashboardModel.js
 const db = require("../config/db"); // Update path if needed
-const moment = require('moment');
+const moment = require('moment-timezone');
+
 
 
 const getAllActiveTeams = (callback) => {
@@ -15,6 +16,11 @@ const getAllActiveTeams = (callback) => {
   });
 };
 
+function getCurrentISTDate(format = "YYYY-MM-DD HH:mm:ss") {
+  return moment().tz("Asia/Kolkata").format(format);
+}
+
+// Main function
 const getTotalData = async ({
   filter_type = '',
   consultantid = '',
@@ -25,7 +31,7 @@ const getTotalData = async ({
   session_user_id = '',
   team_id = ''
 }) => {
-  let query = `SELECT id FROM tbl_booking`;
+  let query = `SELECT id FROM tbl_booking b`;
   let conditions = [];
   let params = [];
 
@@ -36,6 +42,7 @@ const getTotalData = async ({
   const hasConsultant = consultantIdInt !== null;
   const hasCrm = crmIdInt !== null;
 
+  // Consultant & CRM filters
   if (hasConsultant && hasCrm) {
     conditions.push(`(fld_consultantid = ? OR fld_secondary_consultant_id = ? OR fld_third_consultantid = ?) AND fld_addedby = ?`);
     params.push(consultantIdInt, consultantIdInt, consultantIdInt, crmIdInt);
@@ -46,6 +53,7 @@ const getTotalData = async ({
     conditions.push(`fld_addedby = ?`);
     params.push(crmIdInt);
   } else {
+    // Session user filters
     if (session_user_type === 'EXECUTIVE' && sessionUserIdInt !== null) {
       conditions.push(`fld_addedby = ?`);
       params.push(sessionUserIdInt);
@@ -54,8 +62,11 @@ const getTotalData = async ({
       params.push(sessionUserIdInt, sessionUserIdInt, sessionUserIdInt);
     } else if (session_user_type === 'SUBADMIN' && sessionUserIdInt !== null) {
       if (team_id) {
-        conditions.push(`(fld_consultantid = ? OR FIND_IN_SET(?, fld_teamid))`);
-        params.push(sessionUserIdInt, team_id);
+        // team_id can be comma separated
+        const teamIds = team_id.split(",").map(id => id.trim()).filter(Boolean);
+        const findInSet = teamIds.map(() => "FIND_IN_SET(?, b.fld_teamid)").join(" OR ");
+        conditions.push(`(fld_consultantid = ? OR ${findInSet})`);
+        params.push(sessionUserIdInt, ...teamIds);
       } else {
         conditions.push(`fld_consultantid = ?`);
         params.push(sessionUserIdInt);
@@ -63,38 +74,44 @@ const getTotalData = async ({
     }
   }
 
+  // Sale type filter
   if (sale_type) {
     conditions.push(`fld_sale_type = ?`);
     params.push(sale_type);
   }
 
+  // Converted status
   if (converted_sts === 'Converted') {
     conditions.push(`LOWER(TRIM(fld_converted_sts)) = 'yes'`);
   }
 
-   if (filter_type) {
+  // Date filters
+  if (filter_type) {
     let startDate = null;
     let endDate = null;
 
     switch (filter_type) {
       case 'Today':
-        startDate = moment().startOf('day').format('YYYY-MM-DD HH:mm:ss');
-        endDate = moment().endOf('day').format('YYYY-MM-DD HH:mm:ss');
+        startDate = moment().tz("Asia/Kolkata").startOf('day').format('YYYY-MM-DD HH:mm:ss');
+        endDate = moment().tz("Asia/Kolkata").endOf('day').format('YYYY-MM-DD HH:mm:ss');
         break;
 
       case 'Week':
-        startDate = moment().startOf('week').format('YYYY-MM-DD HH:mm:ss');
-        endDate = moment().endOf('week').format('YYYY-MM-DD HH:mm:ss');
+        startDate = moment().tz("Asia/Kolkata").startOf('week').format('YYYY-MM-DD HH:mm:ss');
+        endDate = moment().tz("Asia/Kolkata").endOf('week').format('YYYY-MM-DD HH:mm:ss');
         break;
 
       case 'Month':
-        startDate = moment().startOf('month').format('YYYY-MM-DD HH:mm:ss');
-        endDate = moment().endOf('day').format('YYYY-MM-DD HH:mm:ss');
+        startDate = moment().tz("Asia/Kolkata").startOf('month').format('YYYY-MM-DD HH:mm:ss');
+        endDate = moment().tz("Asia/Kolkata").endOf('day').format('YYYY-MM-DD HH:mm:ss');
         break;
 
       case 'Last':
-        startDate = moment().subtract(1, 'months').startOf('month').format('YYYY-MM-DD HH:mm:ss');
-        endDate = moment().subtract(1, 'months').endOf('month').format('YYYY-MM-DD HH:mm:ss');
+        startDate = moment().tz("Asia/Kolkata").subtract(1, 'months').startOf('month').format('YYYY-MM-DD HH:mm:ss');
+        endDate = moment().tz("Asia/Kolkata").subtract(1, 'months').endOf('month').format('YYYY-MM-DD HH:mm:ss');
+        break;
+
+      default:
         break;
     }
 
@@ -104,7 +121,7 @@ const getTotalData = async ({
     }
   }
 
-
+  // Final query
   if (conditions.length > 0) {
     query += ` WHERE ` + conditions.join(' AND ');
   }
@@ -114,18 +131,11 @@ const getTotalData = async ({
 
   return new Promise((resolve, reject) => {
     db.getConnection((err, connection) => {
-      if (err) {
-        console.error('DB connection error:', err);
-        return reject(err);
-      }
+      if (err) return reject(err);
 
       connection.query(query, params, (error, results) => {
-        connection.release(); // ✅ release connection always
-
-        if (error) {
-          console.error('DB Query Error:', error);
-          return reject(error);
-        }
+        connection.release();
+        if (error) return reject(error);
 
         resolve(results.length || 0);
       });
@@ -134,7 +144,7 @@ const getTotalData = async ({
 };
 
 const getParticularStatusCallsOfCrm = (crm_id, status, callback) => {
-  const currentDate = moment();
+const currentDate = moment().tz("Asia/Kolkata");
   const twoDaysBefore = currentDate.clone().subtract(2, 'days').format('YYYY-MM-DD');
   const twoDaysAfter = currentDate.clone().add(2, 'days').format('YYYY-MM-DD');
 

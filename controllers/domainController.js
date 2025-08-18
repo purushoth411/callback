@@ -2,11 +2,14 @@
 const helperModel = require("../models/helperModel");
 const domainModel = require("../models/domainModel");
 const db = require("../config/db");
-const moment =require('moment');
+const moment = require('moment-timezone');
+
 const { getIO } = require("../socket");
 
 
-
+function getCurrentDate(format = "YYYY-MM-DD") {
+  return moment().tz("Asia/Kolkata").format(format);
+}
 
 const addDomain = (req, res) => {
   const {
@@ -31,7 +34,7 @@ const addDomain = (req, res) => {
   const data = {
     domain,
     cosultantId,
-    fld_addedon: moment().format("YYYY-MM-DD HH:mm:ss"),
+    fld_addedon: getCurrentDate("YYYY-MM-DD HH:mm:ss"),
     status: "Active",
   };
 
@@ -97,7 +100,7 @@ const updateDomain = (req, res) => {
   const data = {
     domain,
     cosultantId,
-    fld_addedon: moment().format("YYYY-MM-DD HH:mm:ss"),
+    fld_addedon: getCurrentDate("YYYY-MM-DD HH:mm:ss"),
   };
 
   try {

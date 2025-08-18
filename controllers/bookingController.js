@@ -13,6 +13,10 @@ const path = require("path");
 const fs = require("fs");
 const { getIO } = require("../socket");
 
+function getCurrentDate(format = "YYYY-MM-DD") {
+  return moment().tz("Asia/Kolkata").format(format);
+}
+
 const fetchBookings = (req, res) => {
   const userId = req.user?.id || req.body.userId;
   const userType = req.user?.type || req.body.userType;
@@ -380,7 +384,7 @@ const insertCallRequest = (req, res) => {
           fld_email: email.trim(),
           fld_phone: phone.trim(),
           fld_verify: verifycode,
-          fld_addedon: moment().format("YYYY-MM-DD"),
+          fld_addedon: getCurrentDate("YYYY-MM-DD"),
         };
 
         // STEP 3: Insert User
@@ -437,7 +441,7 @@ const insertCallRequest = (req, res) => {
                   fld_que_counter: que_counter,
                   fld_question_data: question_data_string,
                   fld_answer_data: str_answer_data,
-                  fld_addedon: moment().format("YYYY-MM-DD"),
+                  fld_addedon: getCurrentDate("YYYY-MM-DD"),
                   fld_call_request_sts: "Consultant Assigned",
                   fld_consultant_assigned_by_admin: "Yes",
                   fld_consultant_approve_sts: "Yes",
@@ -505,7 +509,7 @@ const insertCallRequest = (req, res) => {
                         planId: client_plan_id,
                         requestMessage: requestMessage,
                         userId: crm_id,
-                        addedon: moment().format("YYYY-MM-DD"),
+                        addedon: getCurrentDate("YYYY-MM-DD"),
                       };
 
                       bookingModel.insertAddCallRequest(
@@ -540,7 +544,7 @@ const insertCallRequest = (req, res) => {
                         fld_call_added_by: adminId,
                         fld_consultation_sts: "Pending",
                         fld_call_request_sts: "Pending",
-                        fld_added_on: moment().format("YYYY-MM-DD"),
+                        fld_added_on: getCurrentDate("YYYY-MM-DD"),
                       };
 
                       bookingModel.insertExternalCall(extCallData, (err) => {
@@ -560,7 +564,7 @@ const insertCallRequest = (req, res) => {
                         fld_booking_id: bookingId,
                         fld_comment: extComment,
                         fld_notif_for: "SUBADMIN",
-                        fld_addedon: moment().format("YYYY-MM-DD"),
+                        fld_addedon: getCurrentDate("YYYY-MM-DD"),
                       };
 
                       bookingModel.insertBookingHistory(extHistory, (err) => {
@@ -610,7 +614,7 @@ const insertCallRequest = (req, res) => {
                             fld_comment: comment,
                             fld_notif_for: "EXECUTIVE",
                             fld_notif_for_id: user?.fld_admin_id || adminId,
-                            fld_addedon: moment().format("YYYY-MM-DD"),
+                            fld_addedon: getCurrentDate("YYYY-MM-DD"),
                           };
 
                           bookingModel.insertBookingHistory(history1, (err) => {
@@ -660,7 +664,7 @@ const insertCallRequest = (req, res) => {
                             fld_comment: comment2,
                             fld_notif_for: "EXECUTIVE",
                             fld_notif_for_id: user?.fld_admin_id || adminId,
-                            fld_addedon: moment().format("YYYY-MM-DD"),
+                            fld_addedon: getCurrentDate("YYYY-MM-DD"),
                           };
 
                           bookingModel.insertBookingHistory(history2, (err) => {
@@ -742,11 +746,12 @@ function generateUserCode() {
 
 
 function getFormattedDate() {
-  return moment().format("DD-MMM-YYYY"); // e.g., 13-Aug-2025
+  return moment().tz("Asia/Kolkata").format("DD-MMM-YYYY"); 
 }
 
-function getFormattedTime() {
-  return moment().format("hh:mm A"); // e.g., 10:45 AM
+
+ function getFormattedTime() {
+  return moment().tz("Asia/Kolkata").format("hh:mm A"); 
 }
 
 const checkPostsaleCompletedCalls = (req, res) => {
@@ -796,7 +801,7 @@ const saveCallScheduling = (req, res) => {
     return res.json({ status: false, message: "Missing required data." });
   }
 
-  const booking_date = moment(bookingDate).format("YYYY-MM-DD");
+  const booking_date = moment.tz(bookingDate, "Asia/Kolkata").format("YYYY-MM-DD");
   const booking_slot = slot;
   const slcttimezone = timezone;
   const call_joining_link = callLink;
@@ -807,7 +812,7 @@ const saveCallScheduling = (req, res) => {
     fld_timezone: slcttimezone,
     fld_call_joining_link: call_joining_link,
     fld_call_request_sts: "Call Scheduled",
-    fld_addedon: moment().format("YYYY-MM-DD HH:mm:ss"),
+    fld_addedon: getCurrentDate("YYYY-MM-DD HH:mm:ss"),
   };
 
   // Step 1: Update Booking
@@ -839,7 +844,7 @@ const saveCallScheduling = (req, res) => {
           fld_comment: comment,
           fld_notif_for: admin.fld_admin_type,
           fld_notif_for_id: consultantId,
-          fld_addedon: moment().format("YYYY-MM-DD"),
+          fld_addedon: getCurrentDate("YYYY-MM-DD"),
         };
 
         // Step 4: Insert Primary Consultant History
@@ -928,7 +933,7 @@ const saveCallScheduling = (req, res) => {
                   fld_comment: secComment,
                   fld_notif_for: secAdmin.fld_admin_type,
                   fld_notif_for_id: secondaryConsultantId, // Fixed: should be secondaryConsultantId
-                  fld_addedon: moment().format("YYYY-MM-DD"),
+                  fld_addedon: getCurrentDate("YYYY-MM-DD"),
                 };
 
                 bookingModel.insertBookingHistory(secHistory, (err) => {
@@ -989,7 +994,7 @@ const updateCallScheduling = (req, res) => {
 
     const oldBookingRow = bookingRows[0];
 
-    const booking_date = moment(bookingDate).format("YYYY-MM-DD");
+    const booking_date = moment.tz(bookingDate, "Asia/Kolkata").format("YYYY-MM-DD");
     const booking_slot = slot;
     const slcttimezone = timezone;
     const call_joining_link = callLink;
@@ -1006,7 +1011,7 @@ const updateCallScheduling = (req, res) => {
       fld_call_request_sts: "Call Rescheduled",
       fld_consultation_sts: "Pending",
       fld_call_confirmation_status: "",
-      fld_addedon: moment().format("YYYY-MM-DD HH:mm:ss"),
+      fld_addedon: getCurrentDate("YYYY-MM-DD HH:mm:ss"),
     };
 
     bookingModel.updateBooking(bookingId, bookingData, (err) => {
@@ -1031,14 +1036,17 @@ const updateCallScheduling = (req, res) => {
           return res.json({ status: false, message: "Consultant not found." });
         }
 
-        const oldDateTimeFormatted = moment(
-          oldBookingRow.fld_booking_date + " " + oldBookingRow.fld_booking_slot,
-          "YYYY-MM-DD hh:mm A"
-        ).format("ddd DD MMM, YYYY hh:mm A");
-        const newDateTimeFormatted = moment(
-          bookingDate + " " + slot,
-          "YYYY-MM-DD hh:mm A"
-        ).format("ddd DD MMM, YYYY hh:mm A");
+        const oldDateTimeFormatted = moment.tz(
+  oldBookingRow.fld_booking_date + " " + oldBookingRow.fld_booking_slot,
+  "YYYY-MM-DD hh:mm A",
+  "Asia/Kolkata"
+).format("ddd DD MMM, YYYY hh:mm A");
+
+const newDateTimeFormatted = moment.tz(
+  bookingDate + " " + slot,
+  "YYYY-MM-DD hh:mm A",
+  "Asia/Kolkata"
+).format("ddd DD MMM, YYYY hh:mm A");
 
         const comment = `Call Rescheduled from ${oldDateTimeFormatted} to ${newDateTimeFormatted} by ${
           admin.fld_name
@@ -1049,7 +1057,7 @@ const updateCallScheduling = (req, res) => {
           fld_comment: comment,
           fld_notif_for: admin.fld_admin_type,
           fld_notif_for_id: consultantId,
-          fld_addedon: moment().format("YYYY-MM-DD"),
+          fld_addedon: getCurrentDate("YYYY-MM-DD"),
         };
 
         bookingModel.insertBookingHistory(historyData, (err) => {
@@ -1118,7 +1126,7 @@ const updateCallScheduling = (req, res) => {
                 fld_comment: secComment,
                 fld_notif_for: secAdmin.fld_admin_type,
                 fld_notif_for_id: consultantId,
-                fld_addedon: moment().format("YYYY-MM-DD"),
+                fld_addedon: getCurrentDate("YYYY-MM-DD"),
               };
 
               bookingModel.insertBookingHistory(secHistory, (err) => {
@@ -1142,9 +1150,8 @@ const updateCallScheduling = (req, res) => {
 function sendRescheduleMail({ booking, oldDateTime, newDateTime }, callback) {
   const clientName = booking.user_name || "Client";
   const consultantName = booking.admin_name || "Consultant";
-  const oldDate = moment(oldDateTime, "YYYY-MM-DD h:mm A");
-
-  const newDate = moment(newDateTime, "YYYY-MM-DD h:mm A");
+const oldDate = moment.tz(oldDateTime, "YYYY-MM-DD h:mm A", "Asia/Kolkata");
+const newDate = moment.tz(newDateTime, "YYYY-MM-DD h:mm A", "Asia/Kolkata");
 
   const calendarLink = `http://www.google.com/calendar/event?action=TEMPLATE&text=${encodeURIComponent(
     clientName
@@ -1345,8 +1352,7 @@ const setAsConverted = (req, res) => {
       if (err || !admin)
         return res.json({ status: false, message: "Admin not found." });
 
-      const currentDate = moment().format("DD MMM YYYY");
-      const currentTime = moment().format("hh:mm a");
+     
 
       const comment = `Call status set as converted by ${admin.fld_name}  on ${getFormattedDate()} at ${getFormattedTime()}. RC Code - ${rcCode}, Project Id - ${projectId}`;
 
@@ -1354,7 +1360,7 @@ const setAsConverted = (req, res) => {
       const historyData = {
         fld_booking_id: bookingId,
         fld_comment: comment,
-        fld_addedon: moment().format("YYYY-MM-DD"),
+        fld_addedon: getCurrentDate("YYYY-MM-DD"),
       };
 
       bookingModel.insertBookingHistory(historyData, (err) => {
@@ -1447,8 +1453,7 @@ const updateStatusByCrm = (req, res) => {
         strmsg = "Marked As Client Did Not Join";
       else if (statusByCrm === "Postponed") strmsg = "Postponed";
 
-      const currentDate = moment().format("D MMM YYYY");
-      const currentTime = moment().format("hh:mm a");
+    
       const adminName = user?.fld_name;
       const comment = `Call ${strmsg} by ${adminName}  on ${getFormattedDate()} at ${getFormattedTime()}`;
 
@@ -1463,7 +1468,7 @@ const updateStatusByCrm = (req, res) => {
           fld_comment: comment,
           fld_notif_for: "EXECUTIVE",
           crmIdsNotifi: crmids,
-          fld_addedon: moment().format("YYYY-MM-DD"),
+          fld_addedon: getCurrentDate("YYYY-MM-DD"),
         };
 
         bookingModel.insertBookingHistory(historyData, (err, historyId) => {
@@ -1620,7 +1625,7 @@ const markAsConfirmByClient = (req, res) => {
         fld_comment: comment,
         fld_notif_for: "EXECUTIVE",
         fld_notif_for_id: booking.fld_addedby,
-       fld_addedon: moment().toDate()
+       fld_addedon: getCurrentDate("YYYY-MM-DD")
       };
 
       bookingModel.insertBookingHistory(historyData, (historyErr) => {
@@ -1754,8 +1759,7 @@ const rescheduleOtherBookings = (req, res) => {
         }
 
         let remaining = otherBookings.length;
-        const currentDate = moment().format("DD-MM-YYYY");
-        const currentTime = moment().format("hh:mm A");
+       
 
         otherBookings.forEach((row) => {
           const updateData = {
@@ -1782,7 +1786,7 @@ const rescheduleOtherBookings = (req, res) => {
               fld_comment: comment,
               fld_notif_for: "EXECUTIVE",
               fld_notif_for_id: row.fld_addedby,
-              fld_addedon: moment().toDate(),
+              fld_addedon: getCurrentDate("YYYY-MM-DD"),
             };
 
             bookingModel.insertBookingHistory(historyData, (historyErr) => {
@@ -1845,8 +1849,7 @@ const reassignComment = (req, res) => {
           });
         }
 
-        const get_current_date = moment().format("DD MMM YYYY");
-        const get_current_time = moment().format("hh:mm a");
+    
 
         const comment = `Call reassign request to another consultant by ${user.fld_name}  on ${getFormattedDate()} at ${getFormattedTime()}`;
 
@@ -1855,7 +1858,7 @@ const reassignComment = (req, res) => {
           fld_comment: comment,
           fld_notif_for: "SUPERADMIN",
           fld_notif_for_id: 1,
-          fld_addedon: moment().toDate(),
+          fld_addedon: getCurrentDate("YYYY-MM-DD"),
         };
 
         bookingModel.insertBookingHistory(historyData, (historyErr) => {
@@ -1988,8 +1991,7 @@ const reassignToConsultant = (req, res) => {
             });
           }
 
-          const currentDate = moment().format("YYYY-MM-DD");
-          const currentTime = moment().format("hh:mm A");
+ 
 
           const consultantName = consultant.fld_name || "unknown";
           const adminName = user?.fld_name || "Admin";
@@ -2001,7 +2003,7 @@ const reassignToConsultant = (req, res) => {
             fld_comment: comment,
             fld_notif_for: "CONSULTANT",
             fld_notif_for_id: 1,
-            fld_addedon: moment().toDate(),
+            fld_addedon: getCurrentDate("YYYY-MM-DD"),
           };
 
           bookingModel.insertBookingHistory(historyData, (historyErr) => {
@@ -2265,7 +2267,7 @@ const updateConsultationStatus = async (req, res) => {
           fld_status_options: statusOptionsStr,
           fld_status_options_rescheduled_others:
             status_options_rescheduled_others,
-          fld_call_completed_date: moment().format("YYYY-MM-DD"),
+          fld_call_completed_date: getCurrentDate("YYYY-MM-DD"),
         };
 
         if (uploadedFileName) {
@@ -2282,8 +2284,8 @@ const updateConsultationStatus = async (req, res) => {
         });
 
         // Get current date and time
-        const currentDate = moment().format("DD MMM YYYY");
-        const currentTime = moment().format("hh:mm A");
+        const currentDate = getCurrentDate("DD MMM YYYY");;
+        const currentTime =getCurrentDate("hh:mm A");;
 
         // Get consultant name
         bookingModel.getAdminById(
@@ -2317,7 +2319,7 @@ const updateConsultationStatus = async (req, res) => {
                 if (isExternal && booking.fld_rc_call_request_id > 0) {
                   comments = `External Call ${consultationStatusText} by ${
                     user.fld_name || "Admin"
-                  } on ${currentDate} at ${currentTime}`;
+                  } on ${getFormattedDate()} at ${getFormattedTime()}`;
                 } else {
                   if (consultationStatusText === "Client did not join") {
                     comments = `Call status updated to ${consultationStatusText} by ${consultantData.fld_name}  on ${getFormattedDate()} at ${getFormattedTime()}`;
@@ -2330,7 +2332,7 @@ const updateConsultationStatus = async (req, res) => {
                   fld_booking_id: bookingid,
                   fld_comment: comments,
                   fld_rescheduled_date_time: "",
-                  fld_addedon: moment().format("YYYY-MM-DD"),
+                  fld_addedon: getCurrentDate("YYYY-MM-DD"),
                 };
 
                 bookingModel.insertBookingHistory(overallHistoryData, (err) => {
@@ -2533,9 +2535,9 @@ const handleAcceptedBookingNotification = (bookingInfo) => {
 const handleRejectedOrRescheduledNotification = (bookingInfo, status) => {
   try {
     const callStatus = status === "Reject" ? "Rejected" : status;
-    const bookingDate = moment(bookingInfo.fld_booking_date).format(
-      "DD MMM YYYY"
-    );
+    const bookingDate = moment
+  .tz(bookingInfo.fld_booking_date, "Asia/Kolkata")
+  .format("DD MMM YYYY");
 
     const subject = `Status Updated - ${process.env.WEBNAME || "Website"}`;
     const body = `Hi ${
@@ -2682,7 +2684,7 @@ const assignExternalCall = (req, res) => {
         fld_call_added_by: callAddedBy,
         fld_consultation_sts: "Pending",
         fld_call_request_sts: "Pending",
-        fld_added_on: moment().toDate(),
+        fld_added_on: getCurrentDate("YYYY-MM-DD"),
       };
 
       bookingModel.insertExternalCall(externalCallData, (err, insertedId) => {
@@ -2703,8 +2705,7 @@ const assignExternalCall = (req, res) => {
           }
 
           const now = moment();
-          const formattedDate = now.format("DD-MMM-YYYY"); // e.g., "29-Jul-2025"
-          const formattedTime = now.format("hh:mm A");
+          
 
           const comment = `Call External assigned to consultant ${consultantName} by ${admin.fld_name}  on ${getFormattedDate()} at ${getFormattedTime()}`;
 
@@ -2714,7 +2715,7 @@ const assignExternalCall = (req, res) => {
             fld_comment: comment,
             fld_notif_for: admin.fld_admin_type,
             fld_notif_for_id: process.env.DEFAULT_EXTERNAL_ASSIGN_ID || 0,
-            fld_addedon:moment().toDate(),
+            fld_addedon:getCurrentDate("YYYY-MM-DD"),
           };
 
           bookingModel.insertBookingHistory(historyData, (err, historyId) => {
@@ -2791,9 +2792,7 @@ const checkCompletedCall = (req, res) => {
                 const completedDate = statusHist?.[0]?.fld_call_completed_date;
 
                 if (completedDate) {
-                  const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment(
-                    completedDate
-                  ).format("D MMM YYYY")}`;
+                  const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment.tz(completedDate, "Asia/Kolkata").format("D MMM YYYY")}`;
                   return res.send(
                     `${msg}||${bookingConsultantId}||${primaryConsultantId}`
                   );
@@ -2807,9 +2806,7 @@ const checkCompletedCall = (req, res) => {
                     const fallbackDate = historyRow?.fld_addedon;
 
                     if (fallbackDate) {
-                      const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment(
-                        fallbackDate
-                      ).format("D MMM YYYY")}`;
+                      const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment.tz(fallbackDate, "Asia/Kolkata").format("D MMM YYYY")}`;
                       return res.send(
                         `${msg}||${historyRow.fld_consultantid}||${primaryConsultantId}`
                       );
@@ -2840,7 +2837,8 @@ const updateReassignCallStatus = (req, res) => {
     });
   }
 
-  const inputTime = moment(bookingslot, "h:mm A");
+const inputTime = moment.tz(bookingslot, "h:mm A", "Asia/Kolkata");
+
   const timeSlotVariants = [
     inputTime.format("h:mm A"),
     inputTime.clone().subtract(30, "minutes").format("h:mm A"),
@@ -2898,8 +2896,7 @@ const updateReassignCallStatus = (req, res) => {
 
             const consultantName = adminInfo.fld_name || "Consultant";
             const adminType = adminInfo.fld_admin_type || "CONSULTANT";
-            const currentDate = moment().format("D MMM YYYY");
-            const currentTime = moment().format("h:mm A");
+       
             const reassignedBy = user.fld_name || "Admin";
 
             const comment = `Call Reassigned by consultant ${reassignedBy} to consultant ${consultantName}  on ${getFormattedDate()} at ${getFormattedTime()}`;
@@ -2909,7 +2906,7 @@ const updateReassignCallStatus = (req, res) => {
               fld_comment: comment,
               fld_notif_for: adminType,
               fld_notif_for_id: consultant_id,
-              fld_addedon: moment().format("YYYY-MM-DD"),
+              fld_addedon: getCurrentDate("YYYY-MM-DD"),
             };
 
             bookingModel.insertBookingHistory(historyData1, (err, _) => {
@@ -2925,7 +2922,7 @@ const updateReassignCallStatus = (req, res) => {
                 fld_notif_for: "EXECUTIVE",
                 fld_notif_for_id: bookingInfo.fld_addedby,
                 view_sts: "HIDE",
-                fld_addedon: moment().format("YYYY-MM-DD"),
+                fld_addedon: getCurrentDate("YYYY-MM-DD"),
               };
 
               bookingModel.insertBookingHistory(historyData2, (err, _) => {
@@ -3008,8 +3005,7 @@ const updateExternalConsultationStatus = (req, res) => {
           const adminName = user?.fld_name || "SubAdmin";
           const statusLabel =
             consultation_sts === "Accept" ? "Accepted" : consultation_sts;
-          const currentDate = moment().format("DD MMM YYYY");
-          const currentTime = moment().format("hh:mm A");
+       
           const historyComment = `Call ${statusLabel} by Subadmin ${adminName}  on ${getFormattedDate()} at ${getFormattedTime()}`;
 
           // History
@@ -3017,7 +3013,7 @@ const updateExternalConsultationStatus = (req, res) => {
             {
               fld_booking_id: bookingid,
               fld_comment: historyComment,
-              fld_addedon: moment().format("YYYY-MM-DD"),
+              fld_addedon: getCurrentDate("YYYY-MM-DD"),
             },
             () => {}
           );
@@ -3027,7 +3023,7 @@ const updateExternalConsultationStatus = (req, res) => {
               fld_booking_id: bookingid,
               status: consultation_sts,
               fld_comment: externalCallComnt,
-              fld_call_completed_date: moment().format("YYYY-MM-DD"),
+              fld_call_completed_date: getCurrentDate("YYYY-MM-DD"),
             },
             () => {}
           );
@@ -3121,9 +3117,9 @@ const submitCallCompletionComment = (req, res) => {
       callRecordingSts: "Call Recording Updated",
     };
 
-    const now = moment();
-    const formattedDate = now.format("DD-MMM-YYYY");
-    const formattedTime = now.format("hh:mm A");
+    const now = moment.tz("Asia/Kolkata");
+
+
 
     const adminName = user?.fld_name || "Admin";
     const comment = `Call recording uploaded by ${adminName}  on ${getFormattedDate()} at ${getFormattedTime()}`;
@@ -3255,7 +3251,7 @@ const updateSubjectArea = async (req, res) => {
         fld_consultation_sts: "Pending",
         fld_call_request_sts: "Consultant Assigned",
         fld_call_confirmation_status: "",
-        fld_addedon: moment().format("YYYY-MM-DD HH:mm:ss"), // formatted with moment
+        fld_addedon: getCurrentDate("YYYY-MM-DD HH:mm:ss"), // formatted with moment
       };
 
       // Update booking
@@ -3290,8 +3286,7 @@ const updateSubjectArea = async (req, res) => {
 
           // Insert booking history
           const adminName = user?.fld_name || "Admin";
-          const commentDate = moment().format("D MMM YYYY");
-          const commentTime = moment().format("hh:mm a");
+        
 
           const comment = `Subject area and consultant updated by ${adminName}  on ${getFormattedDate()} at ${getFormattedTime()}`;
 
@@ -3299,7 +3294,7 @@ const updateSubjectArea = async (req, res) => {
             fld_booking_id: bookingid,
             fld_comment: comment,
             fld_notif_view_sts: "READ",
-            fld_addedon: moment().format("YYYY-MM-DD"),
+            fld_addedon: getCurrentDate("YYYY-MM-DD"),
           };
 
           bookingModel.insertBookingHistory(historyData, (historyErr) => {

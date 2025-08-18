@@ -1,8 +1,17 @@
 const db = require("../config/db");
 const instacrm_db = require("../config/instacrm_db");
 // const rc_db = require("../config/rc_db");
-const moment = require("moment");
+const moment = require('moment-timezone');
+
 const axios = require("axios");
+
+function getCurrentDate(format = "YYYY-MM-DD") {
+  return moment().tz("Asia/Kolkata").format(format);
+}
+
+function getDateBefore(days = 0, format = "YYYY-MM-DD") {
+  return moment().tz("Asia/Kolkata").subtract(days, "days").format(format);
+}
 
 const getBookings = (
   userId,
@@ -13,7 +22,7 @@ const getBookings = (
   dashboard_status,
   callback
 ) => {
-  const currentDate = moment();
+  const currentDate = moment().tz("Asia/Kolkata");;
   const twoDaysBefore = currentDate
     .clone()
     .subtract(2, "days")
@@ -84,8 +93,8 @@ const getBookings = (
     }
 
     if (filters.fromDate && filters.toDate) {
-      const today = moment().format("YYYY-MM-DD");
-      const last7DaysStart = moment().subtract(7, "days").format("YYYY-MM-DD");
+     const today = getCurrentDate(); 
+    const last7DaysStart = getDateBefore(7);
 
       if (
         userType === "EXECUTIVE" &&
@@ -170,8 +179,8 @@ const getBookings = (
 
     // EXECUTIVE + last 7 days → prioritize today's addedon
     if (userType === "EXECUTIVE" && filters.fromDate && filters.toDate) {
-      const today = moment().format("YYYY-MM-DD");
-      const last7DaysStart = moment().subtract(7, "days").format("YYYY-MM-DD");
+     const today = getCurrentDate(); 
+    const last7DaysStart = getDateBefore(7);
       if (filters.fromDate === last7DaysStart && filters.toDate === today) {
         orderBy = `
           ORDER BY
@@ -289,8 +298,9 @@ const getBookings = (
 }
 
  else if (userType === "CONSULTANT") {
-      sql += ` AND b.fld_consultantid = ? AND b.fld_call_request_sts != "Consultant Assigned"`;
-      params.push(userId);
+      sql += ` AND b.fld_consultantid = ? AND b.fld_call_request_sts NOT IN (?, ?)`;
+params.push(userId, "Consultant Assigned", "Postponed");
+
       executeQuery(connection);
     } else if (userType === "EXECUTIVE") {
       sql += ` AND b.fld_addedby = ?`;

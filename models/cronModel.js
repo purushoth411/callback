@@ -1,14 +1,22 @@
 const db = require("../config/db"); 
-const moment = require('moment');
+const moment = require('moment-timezone');
 
+
+function getCurrentDate(format = "YYYY-MM-DD") {
+  return moment().tz("Asia/Kolkata").format(format);
+}
+
+function getDateBefore(days = 0, format = "YYYY-MM-DD") {
+  return moment().tz("Asia/Kolkata").subtract(days, "days").format(format);
+}
 const getAbsentConsultantsCallScheduledBookings = (callback) => {
   db.getConnection((err, connection) => {
     if (err) {
       return callback(err, null);
     }
 
-    const today = moment().format("YYYY-MM-DD");
-    const nowTime = moment().format("HH:mm:ss"); // current time in 24hr
+    const today = getCurrentDate("YYYY-MM-DD");
+    const nowTime = getCurrentDate("HH:mm:ss"); // current time in 24hr
 
     const sql = `
       SELECT 

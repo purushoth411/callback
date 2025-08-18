@@ -2,6 +2,11 @@
 const db = require("../config/db"); // Update path if needed
 const moment = require("moment-timezone");
 
+function getCurrentDate(format = "YYYY-MM-DD") {
+  return moment().tz("Asia/Kolkata").format(format);
+}
+
+
 // Get all active teams
 const getAllActiveTeams = (callback) => {
   db.getConnection((err, connection) => {
@@ -774,7 +779,7 @@ let params = [];
       return callback(err);
     }
 
-    const readTime = moment().format("YYYY-MM-DD HH:mm:ss");
+    const readTime = getCurrentDate("YYYY-MM-DD HH:mm:ss");
     const query = `
       UPDATE tbl_booking_chat 
       SET fld_read_status = "READ", fld_read_time = ? 

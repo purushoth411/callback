@@ -2,9 +2,20 @@
 const cronModel = require("../models/cronModel");
 const bookingModel = require("../models/bookingModel");
 const db = require("../config/db");
-const moment = require('moment');
+const moment = require('moment-timezone');
+
 const { getIO } = require("../socket");
 const sendPostmarkMail = require("../sendPostmarkMail");
+
+function getFormattedDate() {
+  return moment().tz("Asia/Kolkata").format("DD-MMM-YYYY"); 
+}
+ function getFormattedTime() {
+  return moment().tz("Asia/Kolkata").format("hh:mm A"); 
+}
+function getCurrentDate(format = "YYYY-MM-DD") {
+  return moment().tz("Asia/Kolkata").format(format);
+}
 
 const consultantAbsentCallCancelled = (callback) => {
   try {
@@ -23,8 +34,8 @@ const consultantAbsentCallCancelled = (callback) => {
 
       bookings.forEach((row) => {
         const bookingId = row.id;
-        const today = moment().format("YYYY-MM-DD");
-        const comment = `Consultant Absent on ${moment(today).format("D MMM YYYY")}`;
+        const today = getCurrentDate("YYYY-MM-DD");
+        const comment = `Consultant Absent on ${getCurrentDate("D MMM YYYY")}`;
 
         // 1️⃣ Cancel the booking
         bookingModel.updateBooking(
@@ -222,7 +233,7 @@ const processAutoAccept = (bookingId, callback) => {
           fld_specific_commnets_for_the_call: '',
           fld_status_options: status_options,
           fld_status_options_rescheduled_others: '',
-          fld_call_completed_date: moment().format('YYYY-MM-DD'),
+          fld_call_completed_date: getCurrentDate('YYYY-MM-DD'),
         };
 
         bookingModel.insertBookingStatusHistory(historyData, (historyErr) => {
@@ -232,8 +243,8 @@ const processAutoAccept = (bookingId, callback) => {
         });
 
         // Get current date and time
-        const currentDate = moment().format('DD MMM YYYY');
-        const currentTime = moment().format('hh:mm A');
+        const currentDate = getCurrentDate('DD MMM YYYY');
+        const currentTime = getCurrentDate('hh:mm A');
 
         // Get consultant name and insert overall history
         bookingModel.getAdminById(booking.fld_consultantid, (adminErr, consultant) => {
@@ -250,7 +261,7 @@ const processAutoAccept = (bookingId, callback) => {
             fld_booking_id: bookingId,
             fld_comment: comments,
             fld_rescheduled_date_time: '',
-            fld_addedon: moment().format('YYYY-MM-DD')
+            fld_addedon:getCurrentDate('YYYY-MM-DD')
           };
 
           bookingModel.insertBookingHistory(overallHistoryData, (historyInsertErr) => {
@@ -267,7 +278,7 @@ const processAutoAccept = (bookingId, callback) => {
                     fld_booking_id: bookingId,
                     fld_comment: secComments,
                     fld_rescheduled_date_time: '',
-                    fld_addedon: moment().format('YYYY-MM-DD')
+                    fld_addedon: getCurrentDate('YYYY-MM-DD')
                   };
 
                   bookingModel.insertBookingHistory(secHistoryData, (secHistoryErr) => {

@@ -2,16 +2,19 @@
 const helperModel = require("../models/helperModel");
 const bookingModel = require("../models/bookingModel");
 const db = require("../config/db");
-const moment = require("moment");
+const moment = require("moment-timezone");
+
 const { getIO, getConnectedUsers } = require("../socket");
 const sendPostmarkMail = require("../sendPostmarkMail");
 
 function getFormattedDate() {
-  return moment().format("DD-MMM-YYYY"); // e.g., 13-Aug-2025
+  return moment().tz("Asia/Kolkata").format("DD-MMM-YYYY");
 }
-
 function getFormattedTime() {
-  return moment().format("hh:mm A"); // e.g., 10:45 AM
+  return moment().tz("Asia/Kolkata").format("hh:mm A");
+}
+function getCurrentDate(format = "YYYY-MM-DD") {
+  return moment().tz("Asia/Kolkata").format(format);
 }
 
 const getAllActiveTeams = (req, res) => {
@@ -520,7 +523,7 @@ const chatSubmit = (req, res) => {
         fld_view_status: "NO",
         fld_sender_id: sender_id,
         fld_receiver_id: receiver_id,
-        fld_addedon: moment().format("YYYY-MM-DD HH:mm:ss"),
+        fld_addedon: getCurrentDate("YYYY-MM-DD HH:mm:ss"),
       };
 
       helperModel.insertChatMessage(insertData, (insertErr, result) => {
@@ -596,14 +599,14 @@ const fetchFollowerData = (req, res) => {
 };
 
 const getSaturdayPosition = (dateString) => {
-  const date = moment(dateString);
+  const date = moment.tz(dateString, "Asia/Kolkata");
   if (date.isoWeekday() !== 6) return false; // Not Saturday
 
   const day = date.date();
   let count = 0;
 
   for (let i = 1; i <= day; i++) {
-    if (moment(date).date(i).isoWeekday() === 6) {
+    if (moment.tz(date, "Asia/Kolkata").date(i).isoWeekday() === 6) {
       count++;
     }
   }
@@ -612,7 +615,7 @@ const getSaturdayPosition = (dateString) => {
 };
 
 const getEndTime = (startTime, hours, minutes) => {
-  const start = moment(startTime, "h:mm A");
+  const start = moment.tz(startTime, "h:mm A", "Asia/Kolkata");
   const end = start.clone().add(hours, "hours").add(minutes, "minutes");
   return end.format("h:mm A");
 };
@@ -635,7 +638,11 @@ const getFollowerConsultant = (req, res) => {
 
     const bookingDateStr = bookingData.fld_booking_date;
     const bookingSlot = bookingData.fld_booking_slot;
-    const bookingMoment = moment(bookingDateStr, "YYYY-MM-DD");
+    const bookingMoment = moment.tz(
+      bookingDateStr,
+      "YYYY-MM-DD",
+      "Asia/Kolkata"
+    );
     const bookindateSaturday = getSaturdayPosition(bookingDateStr);
 
     helperModel.getAllActiveBothConsultants((err, consultants) => {
@@ -686,8 +693,8 @@ const getFollowerConsultant = (req, res) => {
             const extraMinutes = Math.round((totalHours - fullHours) * 60);
             const endTime = getEndTime(startTime, fullHours, extraMinutes);
 
-            let current = moment(startTime, "h:mm A");
-            const finalEnd = moment(endTime, "h:mm A");
+            let current = moment.tz(startTime, "h:mm A", "Asia/Kolkata");
+            const finalEnd = moment.tz(endTime, "h:mm A", "Asia/Kolkata");
 
             while (current.isBefore(finalEnd)) {
               arrBookedSlots.push(current.format("h:mm A"));
@@ -700,19 +707,27 @@ const getFollowerConsultant = (req, res) => {
           helperModel.getConsultantSettingData(
             consultant.id,
             (err, settingData) => {
-              const weekdayShort = bookingMoment.format("ddd").toLowerCase(); // mon, tue...
+              const weekdayShort = bookingMoment
+                .tz("Asia/Kolkata")
+                .format("ddd")
+                .toLowerCase(); // mon, tue...
               const timeBlock = settingData?.[`fld_${weekdayShort}_time_block`];
 
               if (timeBlock) {
                 const timeBlocks = timeBlock.split(" - ");
                 timeBlocks.forEach((t) =>
-                  arrBookedSlots.push(moment(t, "h:mm A").format("h:mm A"))
+                  arrBookedSlots.push(
+                    moment.tz(t, "h:mm A", "Asia/Kolkata").format("h:mm A")
+                  )
                 );
               }
 
               const isSlotTaken = arrBookedSlots.includes(
-                moment(bookingSlot, "HH:mm:ss").format("h:mm A")
+                moment
+                  .tz(bookingSlot, "HH:mm:ss", "Asia/Kolkata")
+                  .format("h:mm A")
               );
+
               const isDateExcluded = settingData?.fld_days_exclusion
                 ?.split("|~|")
                 .includes(bookingDateStr);
@@ -778,7 +793,7 @@ const addFollower = (req, res) => {
             .json({ status: false, message: "Follower already added" });
         }
 
-        const addedon = moment().format("YYYY-MM-DD HH:mm:ss");
+        const addedon = getCurrentDate("YYYY-MM-DD HH:mm:ss");
         const followerData = {
           bookingid: bookingid,
           follower_consultant_id: followerConsultantId,
@@ -793,15 +808,15 @@ const addFollower = (req, res) => {
               .json({ status: false, message: "Failed to insert follower" });
           }
 
-          const commentDate = moment().format("D MMM YYYY");
-          const commentTime = moment().format("h:mm a");
-          const comment = `${user.fld_admin_type} ${user.fld_name} added ${followerConsultantName} as a follower  on ${getFormattedDate()} at ${getFormattedTime()}`;
+          const comment = `${user.fld_admin_type} ${
+            user.fld_name
+          } added ${followerConsultantName} as a follower  on ${getFormattedDate()} at ${getFormattedTime()}`;
 
           const historyData = {
             fld_booking_id: bookingid,
             fld_comment: comment,
             fld_notif_view_sts: "READ",
-            fld_addedon: moment().format("YYYY-MM-DD"),
+            fld_addedon: getCurrentDate("YYYY-MM-DD"),
           };
 
           bookingModel.insertBookingHistory(historyData, (err, historyId) => {
@@ -845,13 +860,13 @@ const updateExternalBookingInfo = (req, res) => {
   }
 
   try {
-    const formattedDate = moment(external_booking_date, [
-      "YYYY-MM-DD",
-      "DD-MM-YYYY",
-    ]).format("YYYY-MM-DD");
-    const formattedTime = moment(external_booking_time, "HH:mm").format(
-      "h:mm A"
-    );
+    const formattedDate = moment
+      .tz(external_booking_date, ["YYYY-MM-DD", "DD-MM-YYYY"], "Asia/Kolkata")
+      .format("YYYY-MM-DD");
+
+    const formattedTime = moment
+      .tz(external_booking_time, "HH:mm", "Asia/Kolkata")
+      .format("h:mm A");
 
     const updateData = {
       fld_booking_date: formattedDate,
@@ -868,15 +883,14 @@ const updateExternalBookingInfo = (req, res) => {
       }
 
       const adminName = user.fld_name || "Unknown Admin";
-      const commentDate = moment().format("D MMM YYYY");
-      const commentTime = moment().format("h:mm a");
+
       const comment = `External Call Booking Info Updated by CRM ${adminName}  on ${getFormattedDate()} at ${getFormattedTime()}`;
 
       const historyData = {
         fld_booking_id: bookingid,
         fld_comment: comment,
         fld_notif_for: "SUBADMIN",
-        fld_addedon: moment().format("YYYY-MM-DD"),
+        fld_addedon: getCurrentDate("YYYY-MM-DD"),
       };
 
       bookingModel.insertBookingHistory(historyData, (err2, historyId) => {
@@ -967,9 +981,12 @@ function emitBookingUpdate(bookingId) {
       const updatedBooking = bookingRows[0];
       const io = getIO();
       io.emit("bookingUpdated", updatedBooking);
-      if (updatedBooking.fld_call_request_id && updatedBooking.fld_rc_call_request_id) {
-                    emitRcBookingUpdate(updatedBooking.fld_call_request_id);
-                  }
+      if (
+        updatedBooking.fld_call_request_id &&
+        updatedBooking.fld_rc_call_request_id
+      ) {
+        emitRcBookingUpdate(updatedBooking.fld_call_request_id);
+      }
     }
   });
 }
@@ -986,12 +1003,9 @@ function emitRcBookingUpdate(callRequestId) {
   );
 }
 
-function emitBookingConfirmation(consultantId,date,slot) {
-
-   
-      const io = getIO();
-      io.emit("bookingConfirmed", consultantId,date,slot);
- 
+function emitBookingConfirmation(consultantId, date, slot) {
+  const io = getIO();
+  io.emit("bookingConfirmed", consultantId, date, slot);
 }
 const verifyOtpUrl = (req, res) => {
   const { bookingId, verifyOtpUrl } = req.body;
@@ -1020,7 +1034,7 @@ const verifyOtpUrl = (req, res) => {
       const updateData = {
         fld_otp: verifyEmailOtp,
         fld_call_confirmation_status: "Call Confirmation Pending at Client End",
-        fld_otp_addedon: moment().format("YYYY-MM-DD"),
+        fld_otp_addedon: getCurrentDate("YYYY-MM-DD"),
       };
 
       bookingModel.updateBooking(bookingId, updateData, () => {
@@ -1105,10 +1119,12 @@ const validateOtp = (req, res) => {
             .json({ status: false, message: "Server error" });
         }
         emitBookingUpdate(bookingId);
-        emitBookingConfirmation(bookingInfo.fld_consultantid,bookingInfo.fld_booking_date,bookingInfo.fld_booking_slot);
-        // Insert booking history
-        const currentDate = moment().format("D MMM YYYY");
-        const currentTime = moment().format("h:mm a");
+        emitBookingConfirmation(
+          bookingInfo.fld_consultantid,
+          bookingInfo.fld_booking_date,
+          bookingInfo.fld_booking_slot
+        );
+
         const comment = `Call validated by client  on ${getFormattedDate()} at ${getFormattedTime()}`;
 
         bookingModel.insertBookingHistory(
@@ -1147,9 +1163,6 @@ const validateOtp = (req, res) => {
                         .status(500)
                         .json({ status: false, message: "Server error" });
                     }
-
-                    const currentDateRes = moment().format("D MMM YYYY");
-                    const currentTimeRes = moment().format("h:mm a");
 
                     let processed = 0;
                     if (!otherBookings.length) {
@@ -1200,7 +1213,7 @@ const validateOtp = (req, res) => {
                                 fld_comment: `Call cancelled and to be rescheduled as client did not confirm  on ${getFormattedDate()} at ${getFormattedTime()}`,
                                 fld_notif_for: "EXECUTIVE",
                                 fld_notif_for_id: row.fld_addedby,
-                                fld_addedon: moment().toDate(),
+                                fld_addedon: getCurrentDate("YYYY-MM-DD"),
                               },
                               () => {}
                             );
@@ -1208,11 +1221,7 @@ const validateOtp = (req, res) => {
                             bookingModel.getAdminById(
                               row.fld_addedby,
                               (err, crmDetails) => {
-                                if (
-                                  !err &&
-                                  crmDetails 
-                                 
-                                ) {
+                                if (!err && crmDetails) {
                                   sendPostmarkMail({
                                     to: crmDetails.fld_email,
                                     subject: `Call Rescheduled – Reference ID: ${row.fld_client_id}`,
@@ -1225,7 +1234,6 @@ const validateOtp = (req, res) => {
                               Regards,<br>${process.env.WEBNAME}<br>
                             `,
                                   });
-
                                 }
                                 processed++;
                                 if (processed === otherBookings.length) {
@@ -1265,11 +1273,7 @@ const validateOtp = (req, res) => {
                 bookingModel.getAdminById(
                   bookingInfo.fld_addedby,
                   (err, crmDetails) => {
-                    if (
-                      !err &&
-                      crmDetails 
-                      
-                    ) {
+                    if (!err && crmDetails) {
                       sendPostmarkMail({
                         to: crmDetails.fld_email,
                         subject: `Call confirmed by client ${bookingInfo.fld_name} - Booking Id ${bookingInfo.fld_bookingcode} || ${process.env.WEBNAME}`,

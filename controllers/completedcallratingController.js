@@ -1,7 +1,8 @@
 // controllers/completedcallratingController.js
 const completedcallratingModel = require("../models/completedcallratingModel");
 const db = require("../config/db");
-const moment =require('moment');
+const moment = require('moment-timezone');
+
 
 const getAllActiveCompletedcallratings = (req, res) => {
   completedcallratingModel.getAllActiveCompletedcallratings((err, Completedcallratings) => {

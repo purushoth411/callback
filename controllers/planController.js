@@ -1,7 +1,8 @@
 // controllers/planController.js
 const planModel = require("../models/planModel");
 const db = require("../config/db");
-const moment =require('moment');
+const moment = require('moment-timezone');
+
 
 const getAllActivePlans = (req, res) => {
   planModel.getAllActivePlans((err, Plans) => {
