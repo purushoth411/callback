@@ -7,13 +7,17 @@ const axios = require("axios");
 const getBookings = (
   userId,
   userType,
+  subadminType,
   assigned_team,
   filters,
   dashboard_status,
   callback
 ) => {
   const currentDate = moment();
-  const twoDaysBefore = currentDate.clone().subtract(2, "days").format("YYYY-MM-DD");
+  const twoDaysBefore = currentDate
+    .clone()
+    .subtract(2, "days")
+    .format("YYYY-MM-DD");
   const twoDaysAfter = currentDate.clone().add(2, "days").format("YYYY-MM-DD");
 
   let sql = `
@@ -42,7 +46,10 @@ const getBookings = (
   // Build Filters
   // -------------------------
   const buildFilters = () => {
-    if (Array.isArray(filters.consultationStatus) && filters.consultationStatus.length > 0) {
+    if (
+      Array.isArray(filters.consultationStatus) &&
+      filters.consultationStatus.length > 0
+    ) {
       const placeholders = filters.consultationStatus.map(() => "?").join(",");
       sql += ` AND b.fld_call_request_sts IN (${placeholders})`;
       params.push(...filters.consultationStatus);
@@ -76,39 +83,59 @@ const getBookings = (
       params.push(`%${filters.search}%`, `%${filters.search}%`);
     }
 
-   if (filters.fromDate && filters.toDate) {
-  const today = moment().format("YYYY-MM-DD");
-  const last7DaysStart = moment().subtract(7, "days").format("YYYY-MM-DD");
+    if (filters.fromDate && filters.toDate) {
+      const today = moment().format("YYYY-MM-DD");
+      const last7DaysStart = moment().subtract(7, "days").format("YYYY-MM-DD");
 
-  if (
-    userType === "EXECUTIVE" &&
-    filters.filter_type === "Booking" &&
-    filters.fromDate === last7DaysStart &&
-    filters.toDate === today
-  ) {
-    // For executive: last 7 days booking date + today's created rows
-    sql += ` AND (
+      if (
+        userType === "EXECUTIVE" &&
+        filters.filter_type === "Booking" &&
+        filters.fromDate === last7DaysStart &&
+        filters.toDate === today
+      ) {
+        // For executive: last 7 days booking date + today's created rows
+
+        sql += ` AND (
                DATE(b.fld_booking_date) BETWEEN ? AND ?
                OR DATE(b.fld_addedon) = ?
+               OR DATE(b.fld_booking_date) > ?
              )`;
-    params.push(filters.fromDate, filters.toDate, today);
-  } else {
-    // Normal filter
-    const dateField =
-      filters.filter_type === "Created"
-        ? "b.fld_addedon"
-        : "b.fld_booking_date";
-    sql += ` AND DATE(${dateField}) BETWEEN ? AND ?`;
-    params.push(filters.fromDate, filters.toDate);
-  }
-}else if (filters.fromDate) {
+        params.push(filters.fromDate, filters.toDate, today, today);
+      } else if (
+        userType === "CONSULTANT" &&
+        filters.filter_type === "Booking" &&
+        filters.fromDate === last7DaysStart &&
+        filters.toDate === today
+      ) {
+        // For executive: last 7 days booking date + today's created rows
+
+        sql += ` AND (
+               DATE(b.fld_booking_date) BETWEEN ? AND ?
+               
+               OR DATE(b.fld_booking_date) > ?
+             )`;
+        params.push(filters.fromDate, filters.toDate, today);
+      } else {
+        // Normal filter
+        const dateField =
+          filters.filter_type === "Created"
+            ? "b.fld_addedon"
+            : "b.fld_booking_date";
+        sql += ` AND DATE(${dateField}) BETWEEN ? AND ?`;
+        params.push(filters.fromDate, filters.toDate);
+      }
+    } else if (filters.fromDate) {
       const dateField =
-        filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
+        filters.filter_type === "Created"
+          ? "b.fld_addedon"
+          : "b.fld_booking_date";
       sql += ` AND DATE(${dateField}) >= ?`;
       params.push(filters.fromDate);
     } else if (filters.toDate) {
       const dateField =
-        filters.filter_type === "Created" ? "b.fld_addedon" : "b.fld_booking_date";
+        filters.filter_type === "Created"
+          ? "b.fld_addedon"
+          : "b.fld_booking_date";
       sql += ` AND DATE(${dateField}) <= ?`;
       params.push(filters.toDate);
     }
@@ -193,43 +220,75 @@ const getBookings = (
     if (userType === "SUPERADMIN") {
       executeQuery(connection);
     } else if (userType === "SUBADMIN" && assigned_team) {
-      const teamIds = assigned_team.split(",").map((id) => id.trim()).filter(Boolean);
+  const teamIds = assigned_team
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
 
-      if (teamIds.length > 0) {
-        const placeholders = teamIds.map(() => "?").join(",");
-        const teamQuery = `SELECT team_members FROM tbl_teams WHERE id IN (${placeholders})`;
+  if (subadminType === "consultant_sub") {
+    // Only fetch bookings for consultants in assigned teams
+    if (teamIds.length > 0) {
+      const placeholders = teamIds.map(() => "FIND_IN_SET(?, a.fld_team_id)").join(" OR ");
+      const adminQuery = `SELECT id FROM tbl_admin a WHERE ${placeholders}`;
 
-        connection.query(teamQuery, teamIds, (err, rows) => {
-          if (err) {
-            connection.release();
-            return callback(err);
-          }
+      connection.query(adminQuery, teamIds, (err, adminRows) => {
+        if (err) {
+          connection.release();
+          return callback(err);
+        }
 
-          let teamUserIds = [];
-          rows.forEach((row) => {
-            if (row.team_members) {
-              teamUserIds.push(...row.team_members.split(",").map((id) => id.trim()));
-            }
-          });
+        const consultantIds = adminRows.map((row) => row.id);
+        if (consultantIds.length === 0) {
+          connection.release();
+          return callback(null, []);
+        }
 
-          const uniqueUserIds = [...new Set([...teamUserIds, String(userId)])];
-          if (uniqueUserIds.length === 0) {
-            connection.release();
-            return callback(null, []);
-          }
+        const uidPlaceholders = consultantIds.map(() => "?").join(",");
+        sql += ` AND b.fld_consultantid IN (${uidPlaceholders})`;
+        params.push(...consultantIds);
 
-          const uidPlaceholders = uniqueUserIds.map(() => "?").join(",");
-          sql += ` AND (b.fld_consultantid IN (${uidPlaceholders}) OR b.fld_addedby IN (${uidPlaceholders}))`;
-          params.push(...uniqueUserIds, ...uniqueUserIds);
-
-          executeQuery(connection);
-        });
-      } else {
-        sql += ` AND (b.fld_consultantid = ? OR b.fld_addedby = ?)`;
-        params.push(userId, userId);
         executeQuery(connection);
-      }
-    } else if (userType === "CONSULTANT") {
+      });
+    } else {
+      sql += ` AND b.fld_consultantid = ?`;
+      params.push(userId);
+      executeQuery(connection);
+    }
+  } else {
+    // Other SUBADMINs: fetch bookings added by them or their team members
+    if (teamIds.length > 0) {
+      const placeholders = teamIds.map(() => "FIND_IN_SET(?, a.fld_team_id)").join(" OR ");
+      const adminQuery = `SELECT id FROM tbl_admin a WHERE ${placeholders}`;
+
+      connection.query(adminQuery, teamIds, (err, adminRows) => {
+        if (err) {
+          connection.release();
+          return callback(err);
+        }
+
+        const adminIds = adminRows.map((row) => row.id);
+        const uniqueUserIds = [...new Set([...adminIds, userId])];
+
+        if (uniqueUserIds.length === 0) {
+          connection.release();
+          return callback(null, []);
+        }
+
+        const uidPlaceholders = uniqueUserIds.map(() => "?").join(",");
+        sql += ` AND (b.fld_consultantid IN (${uidPlaceholders}) OR b.fld_addedby IN (${uidPlaceholders}))`;
+        params.push(...uniqueUserIds, ...uniqueUserIds);
+
+        executeQuery(connection);
+      });
+    } else {
+      sql += ` AND (b.fld_consultantid = ? OR b.fld_addedby = ?)`;
+      params.push(userId, userId);
+      executeQuery(connection);
+    }
+  }
+}
+
+ else if (userType === "CONSULTANT") {
       sql += ` AND b.fld_consultantid = ? AND b.fld_call_request_sts != "Consultant Assigned"`;
       params.push(userId);
       executeQuery(connection);
@@ -243,7 +302,6 @@ const getBookings = (
     }
   });
 };
-
 
 const getBookingHistory = (bookingId, callback) => {
   const sql = `
@@ -1519,7 +1577,7 @@ const getFullBookingData = (bookingId, callback) => {
           u.fld_phone AS user_phone,
           a.fld_name AS admin_name
         FROM tbl_booking b
-        LEFT JOIN tbl_users u ON b.fld_userid = u.id
+        LEFT JOIN tbl_user u ON b.fld_userid = u.id
         LEFT JOIN tbl_admin a ON b.fld_consultantid = a.id
         WHERE b.id = ?
       `;

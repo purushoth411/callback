@@ -512,7 +512,7 @@ const chatSubmit = (req, res) => {
         fld_view_status: "NO",
         fld_sender_id: sender_id,
         fld_receiver_id: receiver_id,
-        fld_addedon: moment().format("YYYY-MM-DD"),
+        fld_addedon: moment().format("YYYY-MM-DD HH:mm:ss"),
       };
 
       helperModel.insertChatMessage(insertData, (insertErr, result) => {
@@ -1023,15 +1023,15 @@ const verifyOtpUrl = (req, res) => {
             Thanks & Regards,<br/> ${process.env.WEBNAME}
           `;
 
-        // // sendPostmarkMail(
-        // //   {
-        // //     from: process.env.FROM_EMAIL,
-        // //     to: email,
-        // //     subject,
-        // //     body,
-        // //   },
-        //   () => {}
-        // );
+        sendPostmarkMail(
+          {
+            from: process.env.FROM_EMAIL,
+            to: email,
+            subject,
+            body,
+          },
+          () => {}
+        );
       });
     }
 
@@ -1259,8 +1259,8 @@ const validateOtp = (req, res) => {
                   (err, crmDetails) => {
                     if (
                       !err &&
-                      crmDetails &&
-                      process.env.HOST !== "localhost"
+                      crmDetails 
+                      
                     ) {
                       sendPostmarkMail({
                         to: crmDetails.fld_email,

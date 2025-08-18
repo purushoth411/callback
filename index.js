@@ -32,6 +32,8 @@ const planRoutes = require('./routes/planRoutes');
 const approveaddcallrequestRoutes = require('./routes/approveaddcallrequestRoutes');
 const completedcallratingRoutes = require('./routes/completedcallratingRoutes');
 const followerRoutes = require('./routes/followerRoutes');
+const cronRoutes = require('./routes/cronRoutes');
+const apiRoutes = require('./routes/apiRoutes');
 
 
 app.use('/api/users', userRoutes);
@@ -44,6 +46,8 @@ app.use('/api/plans', planRoutes);
 app.use('/api/approveaddcallrequests', approveaddcallrequestRoutes);
 app.use('/api/completedcallratings', completedcallratingRoutes);
 app.use('/api/followers', followerRoutes);
+app.use('/api/cron', cronRoutes);
+app.use('/api/api', apiRoutes);
 
 
 

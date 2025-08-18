@@ -16,6 +16,8 @@ const { getIO } = require("../socket");
 const fetchBookings = (req, res) => {
   const userId = req.user?.id || req.body.userId;
   const userType = req.user?.type || req.body.userType;
+  const subadminType = req.user?.fld_subadmin_type || req.body.subAdminType;
+
   const assigned_team = req.user?.assigned_team || req.body.assigned_team;
   const filters = req.body.filters || {};
   const dashboard_status = req.body.dashboard_status || null;
@@ -31,6 +33,7 @@ const fetchBookings = (req, res) => {
   bookingModel.getBookings(
     userId,
     userType,
+    subadminType,
     assigned_team,
     filters,
     dashboard_status,

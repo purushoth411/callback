@@ -517,3 +517,25 @@
     at Parser._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
     at Parser.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
     at Protocol.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Protocol.js:38:16)
+2025-08-18 14:42:32 | ERROR | ReferenceError: getIO is not defined
+    at C:\Users\Admin\Pictures\callback\controllers\cronController.js:410:18
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\models\bookingModel.js:1131:7)
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Query._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+    at Query._handleFinalResultPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:149:8)
+    at Query.EofPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:133:8)
+    at Protocol._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
+    at Parser._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
+    at Parser.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
+2025-08-18 14:47:59 | ERROR | ReferenceError: sendPostmarkMail is not defined
+    at C:\Users\Admin\Pictures\callback\controllers\cronController.js:320:11
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\models\bookingModel.js:954:9)
+    at Query.<anonymous> (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:526:10)
+    at Query._callback (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\Connection.js:488:16)
+    at Sequence.end (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Sequence.js:83:24)
+    at Query._handleFinalResultPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:149:8)
+    at Query.EofPacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\sequences\Query.js:133:8)
+    at Protocol._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
+    at Parser._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
+    at Parser.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
