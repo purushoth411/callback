@@ -46,6 +46,7 @@ router.post("/updateExternalConsultationStatus", bookingController.updateExterna
 router.post("/submitCallCompletionComment", bookingController.submitCallCompletionComment);
 router.post("/fetchSummaryBookings", bookingController.fetchSummaryBookings);
 router.post("/updateSubjectArea", bookingController.updateSubjectArea);
+router.get("/getConsultantTeamBookings", bookingController.getConsultantTeamBookings);
 
 
 

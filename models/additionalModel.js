@@ -148,6 +148,7 @@ const viewExternalCalls = async ({ session_user_id, session_user_type, bookingid
           tbl_booking.fld_booking_date,
           tbl_booking.fld_booking_slot,
           tbl_booking.id as bookingid,
+          tbl_booking.fld_client_id,
           consultant_admin.fld_name AS consultant_name,
           tbl_user.fld_email AS user_email,
           tbl_user.fld_name AS user_name,

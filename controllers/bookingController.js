@@ -3348,6 +3348,23 @@ function emitRcBookingUpdate(callRequestId) {
   );
 }
 
+const getConsultantTeamBookings = (req, res) => {
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json({ status: false, message: "userId is required" });
+  }
+
+  bookingModel.getConsultantTeamBookings(userId, (err, results) => {
+    if (err) {
+      console.error("Error in getConsultantTeamBookings:", err);
+      return res.status(500).json({ status: false, message: "Server error" });
+    }
+
+    return res.status(200).json({ status: true, data: results });
+  });
+};
+
 module.exports = {
   fetchBookings,
   getBookingHistory,
@@ -3384,4 +3401,5 @@ module.exports = {
   submitCallCompletionComment,
   fetchSummaryBookings,
   updateSubjectArea,
+  getConsultantTeamBookings,
 };

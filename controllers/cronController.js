@@ -375,17 +375,17 @@ const handleAcceptedBookingNotification = (bookingInfo) => {
         <a href="${otpLink}" style='color: #fff;background-color: #fa713b;border-radius:5px;padding:10px 15px;' target='_blank'>View Booking Details</a><br/>
         <br/>Thanks & Regards,<br/>Team - ${process.env.WEBNAME || 'Website'}`;
 
-      sendPostmarkMail({
-        from: process.env.MAIL_FROM || 'donotreply@rapidcollaborate.com',
-        to: bookingInfo.user_email,
-        subject: clientSubject,
-        body: clientBody,
-        bcc: ''
-      }, (clientEmailErr) => {
-        if (clientEmailErr) {
-          console.error('Error sending client email:', clientEmailErr);
-        }
-      });
+      // sendPostmarkMail({
+      //   from: process.env.MAIL_FROM || 'donotreply@rapidcollaborate.com',
+      //   to: bookingInfo.user_email,
+      //   subject: clientSubject,
+      //   body: clientBody,
+      //   bcc: ''
+      // }, (clientEmailErr) => {
+      //   if (clientEmailErr) {
+      //     console.error('Error sending client email:', clientEmailErr);
+      //   }
+      // });
     }
 
   } catch (error) {

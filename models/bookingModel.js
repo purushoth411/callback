@@ -1,7 +1,7 @@
 const db = require("../config/db");
 const instacrm_db = require("../config/instacrm_db");
 // const rc_db = require("../config/rc_db");
-const moment = require('moment-timezone');
+const moment = require("moment-timezone");
 
 const axios = require("axios");
 
@@ -22,7 +22,7 @@ const getBookings = (
   dashboard_status,
   callback
 ) => {
-  const currentDate = moment().tz("Asia/Kolkata");;
+  const currentDate = moment().tz("Asia/Kolkata");
   const twoDaysBefore = currentDate
     .clone()
     .subtract(2, "days")
@@ -47,6 +47,7 @@ const getBookings = (
     LEFT JOIN tbl_admin crm ON b.fld_addedby = crm.id
     LEFT JOIN tbl_user user ON b.fld_userid = user.id
     WHERE b.callDisabled IS NULL
+    AND b.fld_call_related_to != 'I_am_not_sure'
   `;
 
   const params = [];
@@ -93,8 +94,8 @@ const getBookings = (
     }
 
     if (filters.fromDate && filters.toDate) {
-     const today = getCurrentDate(); 
-    const last7DaysStart = getDateBefore(7);
+      const today = getCurrentDate();
+      const last7DaysStart = getDateBefore(7);
 
       if (
         userType === "EXECUTIVE" &&
@@ -179,8 +180,8 @@ const getBookings = (
 
     // EXECUTIVE + last 7 days → prioritize today's addedon
     if (userType === "EXECUTIVE" && filters.fromDate && filters.toDate) {
-     const today = getCurrentDate(); 
-    const last7DaysStart = getDateBefore(7);
+      const today = getCurrentDate();
+      const last7DaysStart = getDateBefore(7);
       if (filters.fromDate === last7DaysStart && filters.toDate === today) {
         orderBy = `
           ORDER BY
@@ -228,78 +229,86 @@ const getBookings = (
 
     if (userType === "SUPERADMIN") {
       executeQuery(connection);
-    } else if (userType === "SUBADMIN" && assigned_team) {
-  const teamIds = assigned_team
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean);
 
-  if (subadminType === "consultant_sub") {
-    // Only fetch bookings for consultants in assigned teams
-    if (teamIds.length > 0) {
-      const placeholders = teamIds.map(() => "FIND_IN_SET(?, a.fld_team_id)").join(" OR ");
-      const adminQuery = `SELECT id FROM tbl_admin a WHERE ${placeholders}`;
 
-      connection.query(adminQuery, teamIds, (err, adminRows) => {
-        if (err) {
-          connection.release();
-          return callback(err);
-        }
-
-        const consultantIds = adminRows.map((row) => row.id);
-        if (consultantIds.length === 0) {
-          connection.release();
-          return callback(null, []);
-        }
-
-        const uidPlaceholders = consultantIds.map(() => "?").join(",");
-        sql += ` AND b.fld_consultantid IN (${uidPlaceholders})`;
-        params.push(...consultantIds);
-
-        executeQuery(connection);
-      });
-    } else {
-      sql += ` AND b.fld_consultantid = ?`;
-      params.push(userId);
-      executeQuery(connection);
     }
-  } else {
-    // Other SUBADMINs: fetch bookings added by them or their team members
-    if (teamIds.length > 0) {
-      const placeholders = teamIds.map(() => "FIND_IN_SET(?, a.fld_team_id)").join(" OR ");
-      const adminQuery = `SELECT id FROM tbl_admin a WHERE ${placeholders}`;
+    //for subadmin fetching bookingbased on teams
+    else if (userType === "SUBADMIN" && assigned_team) {
+      const teamIds = assigned_team
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
 
-      connection.query(adminQuery, teamIds, (err, adminRows) => {
-        if (err) {
-          connection.release();
-          return callback(err);
+      if (subadminType === "consultant_sub") {
+        // Only fetch bookings for consultants in assigned teams
+        if (teamIds.length > 0) {
+          const placeholders = teamIds
+            .map(() => "FIND_IN_SET(?, a.fld_team_id)")
+            .join(" OR ");
+          const adminQuery = `SELECT id FROM tbl_admin a WHERE ${placeholders}`;
+
+          connection.query(adminQuery, teamIds, (err, adminRows) => {
+            if (err) {
+              connection.release();
+              return callback(err);
+            }
+
+            const consultantIds = adminRows.map((row) => row.id);
+            if (consultantIds.length === 0) {
+              connection.release();
+              return callback(null, []);
+            }
+
+            const uidPlaceholders = consultantIds.map(() => "?").join(",");
+            sql += ` AND b.fld_consultantid IN (${uidPlaceholders})`;
+            params.push(...consultantIds);
+
+            executeQuery(connection);
+          });
+        } else {
+          sql += ` AND b.fld_consultantid = ?`;
+          params.push(userId);
+          executeQuery(connection);
         }
+      } else {
+        // Other SUBADMINs: fetch bookings added by them or their team members
+        if (teamIds.length > 0) {
+          const placeholders = teamIds
+            .map(() => "FIND_IN_SET(?, a.fld_team_id)")
+            .join(" OR ");
+          const adminQuery = `SELECT id FROM tbl_admin a WHERE ${placeholders}`;
 
-        const adminIds = adminRows.map((row) => row.id);
-        const uniqueUserIds = [...new Set([...adminIds, userId])];
+          connection.query(adminQuery, teamIds, (err, adminRows) => {
+            if (err) {
+              connection.release();
+              return callback(err);
+            }
 
-        if (uniqueUserIds.length === 0) {
-          connection.release();
-          return callback(null, []);
+            const adminIds = adminRows.map((row) => row.id);
+            const uniqueUserIds = [...new Set([...adminIds, userId])];
+
+            if (uniqueUserIds.length === 0) {
+              connection.release();
+              return callback(null, []);
+            }
+
+            const uidPlaceholders = uniqueUserIds.map(() => "?").join(",");
+            sql += ` AND (b.fld_consultantid IN (${uidPlaceholders}) OR b.fld_addedby IN (${uidPlaceholders}))`;
+            params.push(...uniqueUserIds, ...uniqueUserIds);
+
+            executeQuery(connection);
+          });
+        } else {
+          sql += ` AND (b.fld_consultantid = ? OR b.fld_addedby = ?)`;
+          params.push(userId, userId);
+          executeQuery(connection);
         }
-
-        const uidPlaceholders = uniqueUserIds.map(() => "?").join(",");
-        sql += ` AND (b.fld_consultantid IN (${uidPlaceholders}) OR b.fld_addedby IN (${uidPlaceholders}))`;
-        params.push(...uniqueUserIds, ...uniqueUserIds);
-
-        executeQuery(connection);
-      });
-    } else {
-      sql += ` AND (b.fld_consultantid = ? OR b.fld_addedby = ?)`;
-      params.push(userId, userId);
-      executeQuery(connection);
-    }
-  }
-}
-
- else if (userType === "CONSULTANT") {
+      }
+    } 
+    ///for consultant skip consultant assigned and postponed(ie, not booking scheduled)
+    else if (userType === "CONSULTANT") {
       sql += ` AND b.fld_consultantid = ? AND b.fld_call_request_sts NOT IN (?, ?)`;
-params.push(userId, "Consultant Assigned", "Postponed");
+      params.push(userId, "Consultant Assigned", "Postponed");
 
       executeQuery(connection);
     } else if (userType === "EXECUTIVE") {
@@ -2203,6 +2212,43 @@ const getBookingByOtpUrl = (bookingId, verifyOtpUrl, callback) => {
   });
 };
 
+const getConsultantTeamBookings = (userId, callback) => {
+
+  const today = moment().tz("Asia/Kolkata").format("YYYY-MM-DD");
+
+
+  const startDate = moment(today).subtract(15, "days").format("YYYY-MM-DD");
+  const endDate = moment(today).add(15, "days").format("YYYY-MM-DD");
+
+  const query = `
+    SELECT 
+      b.id AS booking_id,
+      b.fld_sale_type,
+      b.fld_client_id,
+      b.fld_name AS client_name,
+      b.fld_booking_date,
+      b.fld_booking_slot,
+      u.fld_phone AS client_phone,
+      u.fld_email AS client_email
+    FROM tbl_booking b
+    LEFT JOIN tbl_user u ON b.fld_userid = u.id
+    WHERE b.fld_consultantid = ?
+      AND b.fld_consultant_another_option = 'TEAM'
+      AND b.fld_booking_date BETWEEN ? AND ?
+    ORDER BY b.fld_booking_date DESC
+  `;
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    connection.query(query, [userId, startDate, endDate], (error, results) => {
+      connection.release();
+      if (error) return callback(error);
+      callback(null, results || []);
+    });
+  });
+};
+
 module.exports = {
   getBookings,
   getBookingHistory,
@@ -2246,4 +2292,5 @@ module.exports = {
   fetchSummaryBookings,
   getBookingByOtpUrl,
   getRcCallBookingRequestById,
+  getConsultantTeamBookings,
 };

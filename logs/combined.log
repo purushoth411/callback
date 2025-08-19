@@ -1049,3 +1049,4 @@
     at Protocol._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Protocol.js:291:23)
     at Parser._parsePacket (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:433:10)
     at Parser.write (C:\Users\Admin\Pictures\callback\node_modules\mysql\lib\protocol\Parser.js:43:10)
+2025-08-19 12:31:06 | ERROR | Unhandled Rejection at:
