@@ -1118,7 +1118,7 @@ const validateOtp = (req, res) => {
             .status(500)
             .json({ status: false, message: "Server error" });
         }
-        emitBookingUpdate(bookingId);
+        emitBookingUpdate(booking_id);
         emitBookingConfirmation(
           bookingInfo.fld_consultantid,
           bookingInfo.fld_booking_date,
