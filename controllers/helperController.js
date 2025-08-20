@@ -481,7 +481,7 @@ const getMessageData = (req, res) => {
 };
 
 const chatSubmit = (req, res) => {
-  const { comment, bookingid, sender_id, admin_type } = req.body;
+  const { comment, bookingid, sender_id, admin_type,sender_name } = req.body;
 
   if (!comment || !bookingid || !sender_id || !admin_type) {
     return res
@@ -540,7 +540,8 @@ const chatSubmit = (req, res) => {
         const adminSocketId = connectedUsers[1]; // assuming admin's user ID is 1
 
         const payload = {
-          id: result.insertId, // New chat message ID
+          id: result.insertId,
+          sender_name:sender_name||"Unknown User",
           ...insertData, // All other message fields
         };
 
@@ -553,6 +554,7 @@ const chatSubmit = (req, res) => {
         if (receiverSocketId) {
           io.to(receiverSocketId).emit("notification", payload);
         }
+         io.emit("chatAdded",payload);
 
         return res.status(200).json({
           success: true,
@@ -1045,15 +1047,15 @@ const verifyOtpUrl = (req, res) => {
             Thanks & Regards,<br/> ${process.env.WEBNAME}
           `;
 
-        sendPostmarkMail(
-          {
-            from: process.env.FROM_EMAIL,
-            to: email,
-            subject,
-            body,
-          },
-          () => {}
-        );
+        // sendPostmarkMail(
+        //   {
+        //     from: process.env.FROM_EMAIL,
+        //     to: email,
+        //     subject,
+        //     body,
+        //   },
+        //   () => {}
+        // );
       });
     }
 

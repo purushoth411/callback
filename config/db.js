@@ -2,10 +2,10 @@ var mysql = require('mysql');
 
 var connection = mysql.createPool({
     connectionLimit: 200,
-    // host: 'localhost',
-    // user: 'root',
-    // password: '',
-    // database: 'call_calendar',
+    // host: '50.87.148.156',
+    // user: 'rapidcol_call_ca',
+    // password: 'nv0@Fg)^ZcvW',
+    // database: 'rapidcol_call_calendar',
     host: '162.241.126.79',
     user: 'callcalendaruser',
     password: '92oBlu9@',

@@ -149,14 +149,14 @@ const getBookings = (
       sql += ` AND DATE(${dateField}) <= ?`;
       params.push(filters.toDate);
     }
-
+    const today = moment().tz("Asia/Kolkata").format("YYYY-MM-DD");
     if (dashboard_status) {
       sql += ` AND b.fld_call_request_sts = ?`;
       params.push(dashboard_status);
       sql += ` AND b.fld_consultation_sts = ?`;
       params.push(dashboard_status);
-      sql += ` AND b.fld_booking_date BETWEEN ? AND ?`;
-      params.push(twoDaysBefore, twoDaysAfter);
+      sql += ` AND b.fld_booking_date = ?`;
+      params.push(today);
     }
   };
 
@@ -1785,15 +1785,13 @@ const checkConflictingBookings = (
 
   const params = [consultantId, bookingDate, ...slotVariants, bookingslot];
 
-  db.getConnection((err, connection) => {
-    if (err) return callback(err, null);
+  
 
-    connection.query(sql, params, (queryErr, results) => {
-      connection.release();
+    db.query(sql, params, (queryErr, results) => {
       if (queryErr) return callback(queryErr, null);
       callback(null, results);
     });
-  });
+   
 };
 
 const fetchSummaryBookings = (
@@ -2179,8 +2177,7 @@ const fetchSummaryBookings = (
 };
 
 const getBookingByOtpUrl = (bookingId, verifyOtpUrl, callback) => {
-  db.getConnection((err, connection) => {
-    if (err) return callback(err, null);
+ 
 
     const query = `
       SELECT 
@@ -2205,11 +2202,11 @@ const getBookingByOtpUrl = (bookingId, verifyOtpUrl, callback) => {
       WHERE b.id = ? AND b.fld_verify_otp_url = ?
     `;
 
-    connection.query(query, [bookingId, verifyOtpUrl], (err, results) => {
-      connection.release();
+    db.query(query, [bookingId, verifyOtpUrl], (err, results) => {
+      
       callback(err, results);
     });
-  });
+  
 };
 
 const getConsultantTeamBookings = (userId, callback) => {
@@ -2238,15 +2235,14 @@ const getConsultantTeamBookings = (userId, callback) => {
     ORDER BY b.fld_booking_date DESC
   `;
 
-  db.getConnection((err, connection) => {
-    if (err) return callback(err);
+ 
 
-    connection.query(query, [userId, startDate, endDate], (error, results) => {
-      connection.release();
+    db.query(query, [userId, startDate, endDate], (error, results) => {
+      
       if (error) return callback(error);
       callback(null, results || []);
     });
-  });
+  
 };
 
 module.exports = {

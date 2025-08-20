@@ -83,14 +83,14 @@ const addUser = (req, res) => {
     username,
     name,
     email,
-    phone,
+   
     password,
     consultant_type,
     subadmin_type,
     permissions,
   } = req.body;
 
-  if (!username || !name || !email || !phone || !password) {
+  if (!username || !name || !email || !password) {
     return res.status(400).json({ status: false, message: "Missing required fields" });
   }
 
@@ -110,7 +110,7 @@ const addUser = (req, res) => {
       username,
       name,
       email,
-      phone,
+      
       password,
       consultant_type,
       subadmin_type,
@@ -145,13 +145,13 @@ const updateUser = (req, res) => {
     username,
     name,
     email,
-    phone,
+    
     consultant_type,
     subadmin_type,
     permissions,
   } = req.body;
 
-  if (!username || !name || !email || !phone) {
+  if (!username || !name || !email ) {
     return res.status(400).json({ status: false, message: "Missing required fields" });
   }
 

@@ -144,19 +144,18 @@ const getTotalData = async ({
 };
 
 const getParticularStatusCallsOfCrm = (crm_id, status, callback) => {
-const currentDate = moment().tz("Asia/Kolkata");
-  const twoDaysBefore = currentDate.clone().subtract(2, 'days').format('YYYY-MM-DD');
-  const twoDaysAfter = currentDate.clone().add(2, 'days').format('YYYY-MM-DD');
+
+  const today = moment().tz("Asia/Kolkata").format("YYYY-MM-DD");
 
   let sql = `
     SELECT * FROM tbl_booking
     WHERE fld_call_request_sts = ?
       AND fld_consultation_sts = ?
-      AND fld_booking_date BETWEEN ? AND ?
+      AND fld_booking_date = ?
       AND callDisabled IS NULL
   `;
 
-  const params = [status, status, twoDaysBefore, twoDaysAfter];
+  const params = [status, status, today];
 
   if (crm_id) {
     sql += ` AND fld_addedby = ?`;
