@@ -174,7 +174,7 @@ const getBookings = (
         CASE 
           WHEN DATE(b.fld_booking_date) < CURDATE() THEN b.fld_booking_date 
         END DESC,
-        b.fld_booking_slot ASC
+        b.fld_booking_date ASC
       LIMIT 500
     `;
 
@@ -198,7 +198,7 @@ const getBookings = (
             CASE 
               WHEN DATE(b.fld_booking_date) < CURDATE() THEN b.fld_booking_date
             END DESC,
-            b.fld_booking_slot ASC
+            b.fld_booking_date ASC
           LIMIT 500
         `;
       }
