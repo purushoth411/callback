@@ -1222,6 +1222,34 @@ const validateOtp = (req, res) => {
                               row.fld_addedby,
                               (err, crmDetails) => {
                                 if (!err && crmDetails) {
+                                  try {
+                                    if (crmDetails.fld_email) {
+                                      const link = `${process.env.BASE_URL}/admin/booking_detail/${row.id}`;
+                                      const message = `Your call with the client <b>${row.fld_name}</b> has been <strong>cancelled and to be rescheduled</strong> as the client did not confirm.<br/> 
+<a href="${link}" target="_blank" class="view-task-btn">View Booking</a>`;
+
+                                      axios.post(
+                                        "https://webexback-06cc.onrender.com/api/users/send-loop-updates",
+                                        {
+                                          email: crmDetails.fld_email,
+                                          message,
+                                        }
+                                      );
+
+                                      console.log(
+                                        `Loop update sent to ${crmDetails.fld_email}`
+                                      );
+                                    } else {
+                                      console.warn(
+                                        " No CRM email found for loop update"
+                                      );
+                                    }
+                                  } catch (err) {
+                                    console.error(
+                                      " Failed to send loop update:",
+                                      err.message
+                                    );
+                                  }
                                   sendPostmarkMail({
                                     to: crmDetails.fld_email,
                                     subject: `Call Rescheduled – Reference ID: ${row.fld_client_id}`,
@@ -1274,6 +1302,32 @@ const validateOtp = (req, res) => {
                   bookingInfo.fld_addedby,
                   (err, crmDetails) => {
                     if (!err && crmDetails) {
+                      try {
+                        if (crmDetails.fld_email) {
+                          const link = `${process.env.BASE_URL}/admin/booking_detail/${booking_id}`;
+                          const message = `Your call with the client <b>${bookingInfo.fld_name}</b> has been confirmed by client.<br/> 
+<a href="${link}" target="_blank" class="view-task-btn">View Booking</a>`;
+
+                          axios.post(
+                            "https://webexback-06cc.onrender.com/api/users/send-loop-updates",
+                            {
+                              email: crmDetails.fld_email,
+                              message,
+                            }
+                          );
+
+                          console.log(
+                            `Loop update sent to ${crmDetails.fld_email}`
+                          );
+                        } else {
+                          console.warn(" No CRM email found for loop update");
+                        }
+                      } catch (err) {
+                        console.error(
+                          " Failed to send loop update:",
+                          err.message
+                        );
+                      }
                       sendPostmarkMail({
                         to: crmDetails.fld_email,
                         subject: `Call confirmed by client ${bookingInfo.fld_name} - Booking Id ${bookingInfo.fld_bookingcode} || ${process.env.WEBNAME}`,

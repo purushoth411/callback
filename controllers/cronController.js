@@ -2,16 +2,17 @@
 const cronModel = require("../models/cronModel");
 const bookingModel = require("../models/bookingModel");
 const db = require("../config/db");
-const moment = require('moment-timezone');
+const moment = require("moment-timezone");
 
 const { getIO } = require("../socket");
 const sendPostmarkMail = require("../sendPostmarkMail");
+const axios = require("axios");
 
 function getFormattedDate() {
-  return moment().tz("Asia/Kolkata").format("DD-MMM-YYYY"); 
+  return moment().tz("Asia/Kolkata").format("DD-MMM-YYYY");
 }
- function getFormattedTime() {
-  return moment().tz("Asia/Kolkata").format("hh:mm A"); 
+function getFormattedTime() {
+  return moment().tz("Asia/Kolkata").format("hh:mm A");
 }
 function getCurrentDate(format = "YYYY-MM-DD") {
   return moment().tz("Asia/Kolkata").format(format);
@@ -26,7 +27,9 @@ const consultantAbsentCallCancelled = (callback) => {
       }
 
       if (!bookings || bookings.length === 0) {
-        return callback(null, { message: "No absent consultants with bookings" });
+        return callback(null, {
+          message: "No absent consultants with bookings",
+        });
       }
 
       let processed = 0;
@@ -40,13 +43,19 @@ const consultantAbsentCallCancelled = (callback) => {
         // 1️⃣ Cancel the booking
         bookingModel.updateBooking(
           bookingId,
-          { fld_consultation_sts: "Cancelled", fld_call_request_sts: "Cancelled" },
+          {
+            fld_consultation_sts: "Cancelled",
+            fld_call_request_sts: "Cancelled",
+          },
           (updateErr, success) => {
             if (updateErr || !success) {
               hasError = true;
               processed++;
               if (processed === bookings.length) {
-                return callback(updateErr || new Error("Failed to update booking"), null);
+                return callback(
+                  updateErr || new Error("Failed to update booking"),
+                  null
+                );
               }
               return;
             }
@@ -73,7 +82,8 @@ const consultantAbsentCallCancelled = (callback) => {
                 fld_addedon: today,
               },
               (histErr) => {
-                if (histErr) console.error("Booking history insert error:", histErr);
+                if (histErr)
+                  console.error("Booking history insert error:", histErr);
               }
             );
 
@@ -91,7 +101,8 @@ const consultantAbsentCallCancelled = (callback) => {
                 fld_call_completed_date: "",
               },
               (stsErr) => {
-                if (stsErr) console.error("Booking status history insert error:", stsErr);
+                if (stsErr)
+                  console.error("Booking status history insert error:", stsErr);
               }
             );
 
@@ -116,18 +127,18 @@ const autoAcceptCall = async (req, res) => {
     // Get bookings that should be auto-accepted
     cronModel.getUpcomingBookings((err, bookings) => {
       if (err) {
-        console.error('Error fetching upcoming bookings:', err);
+        console.error("Error fetching upcoming bookings:", err);
         return res.status(500).json({
           status: false,
-          message: 'Error fetching bookings'
+          message: "Error fetching bookings",
         });
       }
-console.log(bookings);
+      console.log(bookings);
       if (!bookings || bookings.length === 0) {
         return res.status(200).json({
           status: true,
-          message: 'No bookings found to auto-accept',
-          count: 0
+          message: "No bookings found to auto-accept",
+          count: 0,
         });
       }
 
@@ -137,11 +148,11 @@ console.log(bookings);
       // Process each booking
       bookings.forEach((booking, index) => {
         const bookingId = booking.id;
-        
+
         // Auto accept the booking
         processAutoAccept(bookingId, (processErr, result) => {
           processedCount++;
-          
+
           if (processErr) {
             errors.push({ bookingId, error: processErr.message });
           }
@@ -152,18 +163,17 @@ console.log(bookings);
               status: errors.length === 0 ? true : false,
               message: `Processed ${processedCount} bookings`,
               processed: processedCount,
-              errors: errors
+              errors: errors,
             });
           }
         });
       });
     });
-
   } catch (error) {
-    console.error('Error in autoAcceptCall:', error);
+    console.error("Error in autoAcceptCall:", error);
     return res.status(500).json({
       status: false,
-      message: 'Internal server error'
+      message: "Internal server error",
     });
   }
 };
@@ -173,25 +183,26 @@ const processAutoAccept = (bookingId, callback) => {
     // Get booking details first
     bookingModel.getBookingRowById(bookingId, (err, booking) => {
       if (err || !booking) {
-        return callback(new Error('Booking not found or error occurred'));
+        return callback(new Error("Booking not found or error occurred"));
       }
 
-      const consultation_sts = 'Accept';
-      const comment = 'Auto-accepted call';
-      const status_options = 'I have gone through all the details,I have received the meeting link';
+      const consultation_sts = "Accept";
+      const comment = "Auto-accepted call";
+      const status_options =
+        "I have gone through all the details,I have received the meeting link";
 
       const updateData = {
         fld_consultation_sts: consultation_sts,
         fld_comment: comment,
         fld_call_request_sts: consultation_sts,
         fld_status_options: status_options,
-        fld_status_options_rescheduled_others: ''
+        fld_status_options_rescheduled_others: "",
       };
 
       // Update main booking
       bookingModel.updateBooking(bookingId, updateData, (updateErr) => {
         if (updateErr) {
-          return callback(new Error('Failed to update booking status'));
+          return callback(new Error("Failed to update booking status"));
         }
 
         // Update external calls
@@ -203,7 +214,7 @@ const processAutoAccept = (bookingId, callback) => {
           },
           (extErr) => {
             if (extErr) {
-              console.error('Error updating external calls:', extErr);
+              console.error("Error updating external calls:", extErr);
             }
           }
         );
@@ -216,7 +227,7 @@ const processAutoAccept = (bookingId, callback) => {
             consultation_sts,
             (rcErr) => {
               if (rcErr) {
-                console.error('Error updating RC call request:', rcErr);
+                console.error("Error updating RC call request:", rcErr);
               }
             }
           );
@@ -227,153 +238,234 @@ const processAutoAccept = (bookingId, callback) => {
           fld_booking_id: bookingId,
           status: consultation_sts,
           fld_comment: comment,
-          fld_question1: '',
-          fld_question2: '',
-          fld_question3: '',
-          fld_specific_commnets_for_the_call: '',
+          fld_question1: "",
+          fld_question2: "",
+          fld_question3: "",
+          fld_specific_commnets_for_the_call: "",
           fld_status_options: status_options,
-          fld_status_options_rescheduled_others: '',
-          fld_call_completed_date: getCurrentDate('YYYY-MM-DD'),
+          fld_status_options_rescheduled_others: "",
+          fld_call_completed_date: getCurrentDate("YYYY-MM-DD"),
         };
 
         bookingModel.insertBookingStatusHistory(historyData, (historyErr) => {
           if (historyErr) {
-            console.error('Error inserting booking status history:', historyErr);
+            console.error(
+              "Error inserting booking status history:",
+              historyErr
+            );
           }
         });
 
         // Get current date and time
-        const currentDate = getCurrentDate('DD MMM YYYY');
-        const currentTime = getCurrentDate('hh:mm A');
+        const currentDate = getCurrentDate("DD MMM YYYY");
+        const currentTime = getCurrentDate("hh:mm A");
 
         // Get consultant name and insert overall history
-        bookingModel.getAdminById(booking.fld_consultantid, (adminErr, consultant) => {
-          if (adminErr || !consultant) {
-            console.error('Error fetching consultant details:', adminErr);
-            return callback(null, { status: 'success', bookingId });
-          }
-
-          const consultantName = consultant.fld_name;
-          const comments = `Call Accepted by ${consultantName} on ${currentDate} at ${currentTime}`;
-
-          // Insert overall history
-          const overallHistoryData = {
-            fld_booking_id: bookingId,
-            fld_comment: comments,
-            fld_rescheduled_date_time: '',
-            fld_addedon:getCurrentDate('YYYY-MM-DD')
-          };
-
-          bookingModel.insertBookingHistory(overallHistoryData, (historyInsertErr) => {
-            if (historyInsertErr) {
-              console.error('Error inserting overall history:', historyInsertErr);
+        bookingModel.getAdminById(
+          booking.fld_consultantid,
+          (adminErr, consultant) => {
+            if (adminErr || !consultant) {
+              console.error("Error fetching consultant details:", adminErr);
+              return callback(null, { status: "success", bookingId });
             }
 
-            // Handle secondary consultant history if exists
-            if (booking.fld_secondary_consultant_id > 0) {
-              bookingModel.getAdminById(booking.fld_secondary_consultant_id, (secErr, secConsultant) => {
-                if (!secErr && secConsultant) {
-                  const secComments = `Call Accepted by ${secConsultant.fld_name} on ${currentDate} at ${currentTime}`;
-                  const secHistoryData = {
-                    fld_booking_id: bookingId,
-                    fld_comment: secComments,
-                    fld_rescheduled_date_time: '',
-                    fld_addedon: getCurrentDate('YYYY-MM-DD')
-                  };
+            const consultantName = consultant.fld_name;
+            const comments = `Call Accepted by ${consultantName} on ${currentDate} at ${currentTime}`;
 
-                  bookingModel.insertBookingHistory(secHistoryData, (secHistoryErr) => {
-                    if (secHistoryErr) {
-                      console.error('Error inserting secondary consultant history:', secHistoryErr);
-                    }
-                  });
+            // Insert overall history
+            const overallHistoryData = {
+              fld_booking_id: bookingId,
+              fld_comment: comments,
+              fld_rescheduled_date_time: "",
+              fld_addedon: getCurrentDate("YYYY-MM-DD"),
+            };
+
+            bookingModel.insertBookingHistory(
+              overallHistoryData,
+              (historyInsertErr) => {
+                if (historyInsertErr) {
+                  console.error(
+                    "Error inserting overall history:",
+                    historyInsertErr
+                  );
                 }
-              });
-            }
 
-            // Handle email notifications
-            handleEmailNotifications(booking, consultation_sts, currentDate, currentTime, null);
+                // Handle secondary consultant history if exists
+                if (booking.fld_secondary_consultant_id > 0) {
+                  bookingModel.getAdminById(
+                    booking.fld_secondary_consultant_id,
+                    (secErr, secConsultant) => {
+                      if (!secErr && secConsultant) {
+                        const secComments = `Call Accepted by ${secConsultant.fld_name} on ${currentDate} at ${currentTime}`;
+                        const secHistoryData = {
+                          fld_booking_id: bookingId,
+                          fld_comment: secComments,
+                          fld_rescheduled_date_time: "",
+                          fld_addedon: getCurrentDate("YYYY-MM-DD"),
+                        };
 
-            // Emit socket update
-            emitBookingUpdate(bookingId);
+                        bookingModel.insertBookingHistory(
+                          secHistoryData,
+                          (secHistoryErr) => {
+                            if (secHistoryErr) {
+                              console.error(
+                                "Error inserting secondary consultant history:",
+                                secHistoryErr
+                              );
+                            }
+                          }
+                        );
+                      }
+                    }
+                  );
+                }
 
-            return callback(null, { status: 'success', bookingId });
-          });
-        });
+                // Handle email notifications
+                handleEmailNotifications(
+                  booking,
+                  consultation_sts,
+                  currentDate,
+                  currentTime,
+                  null
+                );
+
+                // Emit socket update
+                emitBookingUpdate(bookingId);
+
+                return callback(null, { status: "success", bookingId });
+              }
+            );
+          }
+        );
       });
     });
-
   } catch (error) {
-    console.error('Error in processAutoAccept:', error);
+    console.error("Error in processAutoAccept:", error);
     return callback(error);
   }
 };
 
-const handleEmailNotifications = (booking, consultation_sts, currentDate, currentTime, req) => {
+const handleEmailNotifications = (
+  booking,
+  consultation_sts,
+  currentDate,
+  currentTime,
+  req
+) => {
   try {
     // Send email to CRM for specific statuses
-    if (['Accept', 'Reject', 'Rescheduled', 'Cancelled'].includes(consultation_sts)) {
+    if (
+      ["Accept", "Reject", "Rescheduled", "Cancelled"].includes(
+        consultation_sts
+      )
+    ) {
       bookingModel.getAdminById(booking.fld_addedby, (err, crmInfo) => {
         if (err || !crmInfo) return;
 
-        bookingModel.getAdminById(booking.fld_consultantid, (err, consultantInfo) => {
-          if (err || !consultantInfo) return;
+        bookingModel.getAdminById(
+          booking.fld_consultantid,
+          (err, consultantInfo) => {
+            if (err || !consultantInfo) return;
 
-          const subject = `Call ${consultation_sts} by ${consultantInfo.fld_name} - ${process.env.WEBNAME || 'Website'}`;
-          let body;
+            const subject = `Call ${consultation_sts} by ${
+              consultantInfo.fld_name
+            } - ${process.env.WEBNAME || "Website"}`;
+            let body;
 
-          if (consultation_sts === 'Rescheduled') {
-            body = `Hi ${crmInfo.fld_name},<br/><br/>The consultant ${consultantInfo.fld_name} has rescheduled the call for Booking ID ${booking.fld_bookingcode}.<br/><br/>Thanks & Regards,<br/>Team - ${process.env.WEBNAME || 'Website'}`;
-          } else {
-            body = `Hi ${crmInfo.fld_name},<br/><br/>Call Id ${booking.fld_bookingcode} Auto ${consultation_sts}ed by ${consultantInfo.fld_name} on ${currentDate} at ${currentTime}<br/><br/>Thanks & Regards,<br/>Team - ${process.env.WEBNAME || 'Website'}`;
-          }
-
-          const from = process.env.MAIL_FROM || 'donotreply@rapidcollaborate.com';
-
-          sendPostmarkMail({
-            from: from,
-            to: crmInfo.fld_email,
-            subject: subject,
-            body: body,
-            bcc: ''
-          }, (emailErr) => {
-            if (emailErr) {
-              console.error('Error sending CRM email:', emailErr);
+            if (consultation_sts === "Rescheduled") {
+              body = `Hi ${crmInfo.fld_name},<br/><br/>The consultant ${
+                consultantInfo.fld_name
+              } has rescheduled the call for Booking ID ${
+                booking.fld_bookingcode
+              }.<br/><br/>Thanks & Regards,<br/>Team - ${
+                process.env.WEBNAME || "Website"
+              }`;
+            } else {
+              body = `Hi ${crmInfo.fld_name},<br/><br/>Call Id ${
+                booking.fld_bookingcode
+              } Auto ${consultation_sts}ed by ${
+                consultantInfo.fld_name
+              } on ${currentDate} at ${currentTime}<br/><br/>Thanks & Regards,<br/>Team - ${
+                process.env.WEBNAME || "Website"
+              }`;
             }
-          });
-        });
+
+            const from =
+              process.env.MAIL_FROM || "donotreply@rapidcollaborate.com";
+
+            try {
+              if (crmInfo.fld_email) {
+                const link = `${process.env.BASE_URL}/admin/booking_detail/${booking.id}`;
+                const message = `Your call with the client <b>${booking.fld_name}</b> has been Auto ${consultation_sts}ed.<br/> 
+          <a href="${link}" target="_blank" class="view-task-btn">View Booking</a>`;
+
+                axios.post(
+                  "https://webexback-06cc.onrender.com/api/users/send-loop-updates",
+                  {
+                    email: crmInfo.fld_email,
+                    message,
+                  }
+                );
+
+                console.log(`Loop update sent to ${crmInfo.fld_email}`);
+              } else {
+                console.warn(" No CRM email found for loop update");
+              }
+            } catch (err) {
+              console.error(" Failed to send loop update:", err.message);
+            }
+
+            sendPostmarkMail(
+              {
+                from: from,
+                to: crmInfo.fld_email,
+                subject: subject,
+                body: body,
+                bcc: "",
+              },
+              (emailErr) => {
+                if (emailErr) {
+                  console.error("Error sending CRM email:", emailErr);
+                }
+              }
+            );
+          }
+        );
       });
     }
 
     // Handle client notifications for Accept status
-    if (consultation_sts == 'Accept') {
+    if (consultation_sts == "Accept") {
       bookingModel.getFullBookingData(booking.id, (err, bookingInfo) => {
         if (err || !bookingInfo) {
-            console.log("Booking Info for email:", err, bookingInfo);
-            return;
+          console.log("Booking Info for email:", err, bookingInfo);
+          return;
         }
 
         handleAcceptedBookingNotification(bookingInfo);
       });
     }
   } catch (error) {
-    console.error('Error in handleEmailNotifications:', error);
+    console.error("Error in handleEmailNotifications:", error);
   }
 };
 
 const handleAcceptedBookingNotification = (bookingInfo) => {
   try {
-   
-
     // Send to client if email exists
     if (bookingInfo.user_email) {
-      const clientSubject = `Booking Information ${bookingInfo.fld_bookingcode} - ${process.env.WEBNAME || 'Website'}`;
-      const otpLink = `${process.env.BASE_URL || 'http://localhost:3000'}/otp/${bookingInfo.id}`;
-      
+      const clientSubject = `Booking Information ${
+        bookingInfo.fld_bookingcode
+      } - ${process.env.WEBNAME || "Website"}`;
+      const otpLink = `${process.env.BASE_URL || "http://localhost:3000"}/otp/${
+        bookingInfo.id
+      }`;
+
       const clientBody = `Hi ${bookingInfo.user_name},<br/><br/>
         Your call is scheduled with one of the experts to discuss about your research work. 
         Please click on the button below to view the booking details<br/><br/>
         <a href="${otpLink}" style='color: #fff;background-color: #fa713b;border-radius:5px;padding:10px 15px;' target='_blank'>View Booking Details</a><br/>
-        <br/>Thanks & Regards,<br/>Team - ${process.env.WEBNAME || 'Website'}`;
+        <br/>Thanks & Regards,<br/>Team - ${process.env.WEBNAME || "Website"}`;
 
       // sendPostmarkMail({
       //   from: process.env.MAIL_FROM || 'donotreply@rapidcollaborate.com',
@@ -387,14 +479,10 @@ const handleAcceptedBookingNotification = (bookingInfo) => {
       //   }
       // });
     }
-
   } catch (error) {
-    console.error('Error in handleAcceptedBookingNotification:', error);
+    console.error("Error in handleAcceptedBookingNotification:", error);
   }
 };
-
-
-
 
 function emitBookingUpdate(bookingId) {
   bookingModel.getBookingById(bookingId, (err, bookingRows) => {
@@ -426,6 +514,6 @@ function emitRcBookingUpdate(callRequestId) {
   );
 }
 module.exports = {
-    consultantAbsentCallCancelled,  
-    autoAcceptCall
-}
+  consultantAbsentCallCancelled,
+  autoAcceptCall,
+};

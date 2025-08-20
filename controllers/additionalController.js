@@ -67,7 +67,13 @@ const getExternalCalls = async (req, res) => {
       bookingid: bookingid ? parseInt(bookingid) : ''
     };
 
-    const result = await additionalModel.viewExternalCalls(params);
+    let result = []
+    try{
+     result = await additionalModel.viewExternalCalls(params);
+
+    }catch(e){
+      console.error("Error in getExternalCalls:", e);
+    }
 
     return res.json({
       status: true,

@@ -49,8 +49,30 @@ const updateApproveaddcallrequeststatus = (approveaddcallrequestId, status, call
   });
 };
 
+const getAllPendingaddcallrequests = (callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err, null);
+
+    const sql = `
+      SELECT COUNT(*) AS pendingCount 
+      FROM tbl_approve_addcall_request
+      WHERE status = 'Pending'
+    `;
+
+    connection.query(sql, (queryErr, results) => {
+      connection.release();
+      if (queryErr) return callback(queryErr, null);
+
+      // results[0].pendingCount will hold the number
+      return callback(null, results[0].pendingCount);
+    });
+  });
+};
+
+
 module.exports = {
   getAllApproveaddcallrequests,
   getAllActiveApproveaddcallrequests,
-  updateApproveaddcallrequeststatus
+  updateApproveaddcallrequeststatus,
+  getAllPendingaddcallrequests,
 };

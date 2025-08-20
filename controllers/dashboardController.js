@@ -1,8 +1,7 @@
 // controllers/dashboardController.js
 const dashboardModel = require("../models/dashboardModel");
 const db = require("../config/db");
-const moment = require('moment-timezone');
-
+const moment = require("moment-timezone");
 
 function getCurrentDate(format = "YYYY-MM-DD") {
   return moment().tz("Asia/Kolkata").format(format);
@@ -30,71 +29,91 @@ const getCallStatistics = async (req, res) => {
       filter_type,
       session_user_type,
       session_user_id,
-      team_id
+      team_id,
     } = req.body;
 
     // Convert string IDs to integers
     const params = {
       filter_type,
-      consultantid: consultantid ? parseInt(consultantid, 10) : '',
-      crm_id: crm_id ? parseInt(crm_id, 10) : '',
+      consultantid: consultantid ? parseInt(consultantid, 10) : "",
+      crm_id: crm_id ? parseInt(crm_id, 10) : "",
       session_user_type,
-      session_user_id: session_user_id ? parseInt(session_user_id, 10) : '',
-      team_id
+      session_user_id: session_user_id ? parseInt(session_user_id, 10) : "",
+      team_id,
     };
+    let totalbooking = 0;
+    let totalpresales = 0;
+    let converted = 0;
+    let totalpostsales = 0;
 
-    const totalbooking = await dashboardModel.getTotalData(params);
+    try {
+      totalbooking = await dashboardModel.getTotalData(params);
+    } catch (e) {
+      console.log(e);
+    }
 
-    const totalpresales = await dashboardModel.getTotalData({
-      ...params,
-      sale_type: 'Presales'
-    });
+    try {
+      totalpresales = await dashboardModel.getTotalData({
+        ...params,
+        sale_type: "Presales",
+      });
+    } catch (e) {
+      console.log(e);
+    }
 
-    const converted = await dashboardModel.getTotalData({
-      ...params,
-      converted_sts: 'Converted'
-    });
+    try {
+      converted = await dashboardModel.getTotalData({
+        ...params,
+        converted_sts: "Converted",
+      });
+    } catch (e) {
+      console.log(e);
+    }
 
-    const totalpostsales = await dashboardModel.getTotalData({
-      ...params,
-      sale_type: 'Postsales'
-    });
+    try {
+      totalpostsales = await dashboardModel.getTotalData({
+        ...params,
+        sale_type: "Postsales",
+      });
+    } catch (e) {
+      console.log(e);
+    }
 
-    const conversion = totalpresales > 0 ? (converted / totalpresales) * 100 : 0;
+    const conversion =
+      totalpresales > 0 ? (converted / totalpresales) * 100 : 0;
 
     return res.json({
       totalbooking,
       totalpresales,
       conversion: conversion.toFixed(2),
-      totalpostsales
+      totalpostsales,
     });
   } catch (error) {
-    console.error('Error getting call statistics:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("Error getting call statistics:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
 const getParticularStatusCallsOfCrm = (req, res) => {
   const { crm_id, status } = req.body;
 
-  if ( !status) {
-    return res.status(400).json({ status: false, message: 'Missing status' });
+  if (!status) {
+    return res.status(400).json({ status: false, message: "Missing status" });
   }
 
   dashboardModel.getParticularStatusCallsOfCrm(crm_id, status, (err, data) => {
     if (err) {
-      console.error('DB Error:', err);
-      return res.status(500).json({ status: false, message: 'Server error' });
+      console.error("DB Error:", err);
+      return res.status(500).json({ status: false, message: "Server error" });
     }
 
     return res.status(200).json({
       status: true,
-      message: 'Success',
-      data: data.length > 0 ? data : []
+      message: "Success",
+      data: data.length > 0 ? data : [],
     });
   });
 };
-
 
 const getConsultantSettingData = (req, res) => {
   const { consultantid } = req.body;
@@ -120,12 +139,14 @@ const saveConsultantSettings = (req, res) => {
     selectedWeekDays,
     saturdayOff,
     exclusions,
-    timeData = {}
+    timeData = {},
   } = req.body;
 
   // Basic validation
   if (!consultantid || !timezone?.id) {
-    return res.status(400).json({ status: false, message: "Missing required fields" });
+    return res
+      .status(400)
+      .json({ status: false, message: "Missing required fields" });
   }
 
   const data = {
@@ -142,13 +163,15 @@ const saveConsultantSettings = (req, res) => {
     fld_fri_time_data: timeData.fri_time_data ?? null,
     fld_sat_time_data: timeData.sat_time_data ?? null,
 
-    fld_updatedon: getCurrentDate("YYYY-MM-DD HH:mm:ss")
+    fld_updatedon: getCurrentDate("YYYY-MM-DD HH:mm:ss"),
   };
 
   dashboardModel.updateConsultantSettings(consultantid, data, (err, result) => {
     if (err) {
       console.error("Update error:", err);
-      return res.status(500).json({ status: false, message: "Database update failed" });
+      return res
+        .status(500)
+        .json({ status: false, message: "Database update failed" });
     }
 
     return res.status(200).json({
@@ -159,64 +182,67 @@ const saveConsultantSettings = (req, res) => {
 };
 
 const dayFieldMap = {
-  sun: 'fld_sun_time_block',
-  mon: 'fld_mon_time_block',
-  tue: 'fld_tue_time_block',
-  wed: 'fld_wed_time_block',
-  thu: 'fld_thu_time_block',
-  fri: 'fld_fri_time_block',
-  sat: 'fld_sat_time_block',
+  sun: "fld_sun_time_block",
+  mon: "fld_mon_time_block",
+  tue: "fld_tue_time_block",
+  wed: "fld_wed_time_block",
+  thu: "fld_thu_time_block",
+  fri: "fld_fri_time_block",
+  sat: "fld_sat_time_block",
 };
 
 const updateBlockSlots = (req, res) => {
   const { consultantid, day, blockedSlots } = req.body;
 
-  if (!consultantid || !day || typeof blockedSlots !== 'string') {
+  if (!consultantid || !day || typeof blockedSlots !== "string") {
     return res.status(400).json({
       status: false,
-      message: 'Missing required fields: consultantid, day, or blockedSlots',
+      message: "Missing required fields: consultantid, day, or blockedSlots",
     });
   }
 
-  const dayKey = day.toLowerCase(); 
+  const dayKey = day.toLowerCase();
 
   if (!dayFieldMap[dayKey]) {
     return res.status(400).json({
       status: false,
-      message: 'Invalid day value. Must be one of sun, mon, tue, wed, thu, fri, sat',
+      message:
+        "Invalid day value. Must be one of sun, mon, tue, wed, thu, fri, sat",
     });
   }
-
 
   const dataToUpdate = {
     [dayFieldMap[dayKey]]: blockedSlots,
     fld_updatedon: new Date(),
   };
 
-  dashboardModel.updateConsultantSettings(consultantid, dataToUpdate, (err, result) => {
-    if (err) {
-      console.error('DB update error:', err);
-      return res.status(500).json({
-        status: false,
-        message: 'Database error while updating blocked slots',
-        error: err.message || err,
+  dashboardModel.updateConsultantSettings(
+    consultantid,
+    dataToUpdate,
+    (err, result) => {
+      if (err) {
+        console.error("DB update error:", err);
+        return res.status(500).json({
+          status: false,
+          message: "Database error while updating blocked slots",
+          error: err.message || err,
+        });
+      }
+
+      return res.json({
+        status: true,
+        message: "Blocked slots updated successfully",
+        data: result,
       });
     }
-
-    
-    return res.json({
-      status: true,
-      message: 'Blocked slots updated successfully',
-      data: result,
-    });
-  });
+  );
 };
 
 module.exports = {
-    getAllActiveTeams,
-    getCallStatistics,
-    getParticularStatusCallsOfCrm,
-    getConsultantSettingData,
-    saveConsultantSettings,
-    updateBlockSlots,
-}
+  getAllActiveTeams,
+  getCallStatistics,
+  getParticularStatusCallsOfCrm,
+  getConsultantSettingData,
+  saveConsultantSettings,
+  updateBlockSlots,
+};

@@ -2,6 +2,7 @@ const userModel = require('../models/userModel');
 const bookingModel = require('../models/bookingModel');
 const helperModel = require('../models/helperModel');
 const { getIO } = require("../socket");
+const sendPostmarkMail = require('../sendPostmarkMail');
 
 const loginUser = (req, res) => {
     const { username, userpass } = req.body;
@@ -16,8 +17,13 @@ const loginUser = (req, res) => {
         }
 
         if (!user) {
-            return res.status(401).json({ status : false , message: 'Invalid username or password' });
+            return res.status(401).json({ status : false , message: 'Invalid Username' });
         }
+        
+         if (String(user.fld_decrypt_password) !== String(userpass)) {
+      return res.status(400).json({ status: false, message: "Invalid Password" });
+    }
+
         // remove password from the response
         const { userpass: _, ...userData } = user;
         return res.json({ status : true , message: 'Login successful', user: userData });
@@ -313,6 +319,105 @@ const deleteUser = (req, res) => {
         return res.json({ status: true, message: 'User deleted successfully' });
     });
 };
+
+const sendOtpVerification = (req, res) => {
+  const { username } = req.body;
+
+  if (!username) {
+    return res.status(400).json({ status: false, message: "Username is required" });
+  }
+
+  userModel.getUserByUserName(username, (err, userRow) => {
+    if (err) {
+      console.error("DB Fetch Error:", err);
+      return res.status(500).json({ status: false, message: "Error fetching user" });
+    }
+
+    if (!userRow) {
+      return res.status(404).json({ status: false, message: "User not found" });
+    }
+
+    const emailId = userRow.fld_email;
+    const adminId = userRow.id;
+
+    
+    const otpCode = Math.floor(1000 + Math.random() * 9000);
+
+   
+    const subject = `OTP for Reset Password || ${process.env.WEBNAME}`;
+    const body = `
+      Dear ${username},<br/><br/>
+      ${otpCode} is your OTP for Password Reset.<br/><br/>
+      Thanks & regards,<br/>${process.env.WEBNAME}<br/>
+    `;
+
+  
+      sendPostmarkMail(
+        {
+          from: process.env.FROM_EMAIL,
+          to: emailId,
+          bcc: "",
+          subject,
+          body,
+        },
+        (emailErr) => {
+          if (emailErr) {
+            console.error("Email Send Error:", emailErr);
+            return res.status(500).json({ status: false, message: "Failed to send OTP" });
+          }
+
+         
+          userModel.updateOtp(adminId, otpCode, (updateErr) => {
+            if (updateErr) {
+              console.error("DB Update Error:", updateErr);
+              return res.status(500).json({ status: false, message: "Failed to save OTP" });
+            }
+
+            return res.json({
+              status: true,
+              message: "OTP sent successfully",
+              adminId, 
+            });
+          });
+        }
+      );
+
+  });
+};
+
+const verifyOtp = (req, res) => {
+  const { username, otp } = req.body;
+
+  if (!username || !otp) {
+    return res.status(400).json({ status: false, message: "Username and OTP are required" });
+  }
+
+  userModel.getUserByUserName(username, (err, userRow) => {
+    if (err) {
+      console.error("DB Fetch Error:", err);
+      return res.status(500).json({ status: false, message: "Error fetching user" });
+    }
+
+    if (!userRow) {
+      return res.status(404).json({ status: false, message: "User not found" });
+    }
+
+   
+    if (String(userRow.fld_verify) !== String(otp)) {
+      return res.status(400).json({ status: false, message: "Invalid OTP" });
+    }
+
+  
+    return res.json({
+      status: true,
+      message: "OTP verified successfully",
+      password: userRow.fld_decrypt_password, 
+    });
+  });
+};
+
+
+
 module.exports = {
     loginUser,
     getAllUsers,
@@ -322,5 +427,7 @@ module.exports = {
     updateUser,
     updateUserStatus,
     deleteUser,
-    updateAttendance
+    updateAttendance,
+    sendOtpVerification,
+    verifyOtp,
 };

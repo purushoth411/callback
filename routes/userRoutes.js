@@ -16,6 +16,8 @@ router.put('/update/:id', userController.updateUser);
 
 router.put('/update-status/:id', userController.updateUserStatus);
 router.put('/updateAttendance/:id', userController.updateAttendance);
+router.post('/sendOtpVerification', userController.sendOtpVerification);
+router.post('/verifyOtp', userController.verifyOtp);
 
 
 

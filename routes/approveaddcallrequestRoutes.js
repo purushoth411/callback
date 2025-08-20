@@ -5,6 +5,7 @@ const approveaddcallrequestController = require('../controllers/approveaddcallre
 
 router.get('/getAllActiveApproveaddcallrequests', approveaddcallrequestController.getAllActiveApproveaddcallrequests);
 router.get('/getAllApproveaddcallrequests', approveaddcallrequestController.getAllApproveaddcallrequests);
+router.get('/getAllPendingaddcallrequests', approveaddcallrequestController.getAllPendingaddcallrequests);
 router.put('/update-approveaddcallrequest-status/:id', approveaddcallrequestController.updateApproveaddcallrequeststatus);
 
 module.exports = router;

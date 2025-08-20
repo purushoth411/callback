@@ -290,6 +290,20 @@ const deleteUser = (id, callback) => {
   });
 };
 
+const updateOtp = (adminId, otpCode, callback) => {
+  if (!adminId || !otpCode) return callback(new Error("Admin ID and OTP required"));
+
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    const sql = `UPDATE tbl_admin SET fld_verify = ? WHERE id = ?`;
+    connection.query(sql, [otpCode, adminId], (error, result) => {
+      connection.release();
+      if (error) return callback(error);
+      callback(null, result);
+    });
+  });
+};
 
 module.exports = {
     getUserByUserName,
@@ -301,5 +315,6 @@ module.exports = {
     updateUserStatus,
     deleteUser,
     checkUsernameExists,
-    updateAttendance
+    updateAttendance,
+    updateOtp,
 };

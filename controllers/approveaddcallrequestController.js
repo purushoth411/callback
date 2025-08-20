@@ -59,9 +59,25 @@ const updateApproveaddcallrequeststatus = (req, res) => {
   });
 };
 
+const getAllPendingaddcallrequests = (req, res) => {
+  approveaddcallrequestModel.getAllPendingaddcallrequests((err, count) => {
+    if (err) {
+      console.error("Error fetching Approveaddcallrequests count:", err);
+      return res.status(500).json({ status: false, message: "Server error" });
+    }
+
+    return res.json({
+      status: true,
+      message: "Success",
+      count: count || 0, 
+    });
+  });
+};
+
 
 module.exports = {
   getAllActiveApproveaddcallrequests,
   getAllApproveaddcallrequests,
-  updateApproveaddcallrequeststatus
+  updateApproveaddcallrequeststatus,
+  getAllPendingaddcallrequests,
 };
