@@ -3,6 +3,7 @@ const helperModel = require("../models/helperModel");
 const bookingModel = require("../models/bookingModel");
 const db = require("../config/db");
 const moment = require("moment-timezone");
+const axios = require("axios");
 
 const { getIO, getConnectedUsers } = require("../socket");
 const sendPostmarkMail = require("../sendPostmarkMail");
@@ -481,7 +482,7 @@ const getMessageData = (req, res) => {
 };
 
 const chatSubmit = (req, res) => {
-  const { comment, bookingid, sender_id, admin_type,sender_name } = req.body;
+  const { comment, bookingid, sender_id, admin_type, sender_name } = req.body;
 
   if (!comment || !bookingid || !sender_id || !admin_type) {
     return res
@@ -541,7 +542,7 @@ const chatSubmit = (req, res) => {
 
         const payload = {
           id: result.insertId,
-          sender_name:sender_name||"Unknown User",
+          sender_name: sender_name || "Unknown User",
           ...insertData, // All other message fields
         };
 
@@ -554,7 +555,7 @@ const chatSubmit = (req, res) => {
         if (receiverSocketId) {
           io.to(receiverSocketId).emit("notification", payload);
         }
-         io.emit("chatAdded",payload);
+        io.emit("chatAdded", payload);
 
         return res.status(200).json({
           success: true,
@@ -756,16 +757,9 @@ const getFollowerConsultant = (req, res) => {
 };
 
 const addFollower = (req, res) => {
-  const { bookingid, user, followerConsultantId, followerConsultantName } =
-    req.body;
+  const { bookingid, user, followerConsultantId } = req.body;
 
-  if (
-    !bookingid ||
-    !followerConsultantId ||
-    !followerConsultantName ||
-    !user?.id ||
-    !user?.fld_name
-  ) {
+  if (!bookingid || !followerConsultantId || !user?.id || !user?.fld_name) {
     return res
       .status(400)
       .json({ status: false, message: "Missing required data" });
@@ -795,44 +789,83 @@ const addFollower = (req, res) => {
             .json({ status: false, message: "Follower already added" });
         }
 
-        const addedon = getCurrentDate("YYYY-MM-DD HH:mm:ss");
-        const followerData = {
-          bookingid: bookingid,
-          follower_consultant_id: followerConsultantId,
-          consultantid: user.id, // logged-in consultant ID
-          addedon: addedon,
-        };
-
-        helperModel.insertFollower(followerData, (err, insertId) => {
-          if (err || !insertId) {
-            return res
-              .status(500)
-              .json({ status: false, message: "Failed to insert follower" });
+        // ✅ fetch follower details
+        bookingModel.getAdminById(followerConsultantId, (err, follower) => {
+          if (err || !follower) {
+            return res.status(500).json({
+              status: false,
+              message: "Follower consultant not found",
+            });
           }
 
-          const comment = `${user.fld_admin_type} ${
-            user.fld_name
-          } added ${followerConsultantName} as a follower  on ${getFormattedDate()} at ${getFormattedTime()}`;
-
-          const historyData = {
-            fld_booking_id: bookingid,
-            fld_comment: comment,
-            fld_notif_view_sts: "READ",
-            fld_addedon: getCurrentDate("YYYY-MM-DD"),
+          const addedon = getCurrentDate("YYYY-MM-DD HH:mm:ss");
+          const followerData = {
+            bookingid,
+            follower_consultant_id: followerConsultantId,
+            consultantid: user.id, // logged-in consultant ID
+            addedon,
           };
 
-          bookingModel.insertBookingHistory(historyData, (err, historyId) => {
-            if (err || !historyId) {
-              return res
-                .status(500)
-                .json({ status: false, message: "Failed to insert history" });
+          helperModel.insertFollower(followerData, (err, insertId) => {
+            if (err || !insertId) {
+              return res.status(500).json({
+                status: false,
+                message: "Failed to insert follower",
+              });
             }
-            emitBookingUpdate(bookingid);
-            return res.status(200).json({
-              status: true,
-              message: "Follower added successfully",
-              followerId: insertId,
-              historyId: historyId,
+
+            const comment = `${user.fld_admin_type} ${user.fld_name} added ${follower.fld_name} as a follower on ${getFormattedDate()} at ${getFormattedTime()}`;
+
+            const historyData = {
+              fld_booking_id: bookingid,
+              fld_comment: comment,
+              fld_notif_view_sts: "READ",
+              fld_addedon: getCurrentDate("YYYY-MM-DD"),
+            };
+
+            bookingModel.insertBookingHistory(historyData, (err, historyId) => {
+              if (err || !historyId) {
+                return res.status(500).json({
+                  status: false,
+                  message: "Failed to insert history",
+                });
+              }
+
+              emitBookingUpdate(bookingid);
+
+              try {
+                if (follower.fld_email) {
+                  const link = `${process.env.BASE_URL}/followers`;
+                  const message = `${user.fld_name} added you as a follower for the call with client ${bookingRow.fld_name} <br/> 
+<a href="${link}" target="_blank" class="view-task-btn">Go To Follower Calls</a>`;
+
+                  axios.post(
+                    "https://webexback-06cc.onrender.com/api/users/send-loop-updates",
+                    {
+                      email: follower.fld_email,
+                      message,
+                    }
+                  );
+
+                  console.log(`Loop update sent to ${follower.fld_email}`);
+                } else {
+                  console.warn("No follower email found for loop update");
+                }
+              } catch (err) {
+                console.error("Failed to send loop update:", err.message);
+              }
+
+              return res.status(200).json({
+                status: true,
+                message: "Follower added successfully",
+                followerId: insertId,
+                historyId: historyId,
+                followerDetails: {
+                  id: follower.id,
+                  name: follower.fld_name,
+                  email: follower.fld_email,
+                },
+              });
             });
           });
         });
@@ -840,6 +873,7 @@ const addFollower = (req, res) => {
     );
   });
 };
+
 
 const updateExternalBookingInfo = (req, res) => {
   const {
