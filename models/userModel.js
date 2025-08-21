@@ -61,6 +61,8 @@ const getAllUsers = (filters, callback) => {
       params.push(`%${filters.status.trim()}%`);
     }
 
+     sql += " ORDER BY fld_name ASC";
+
     connection.query(sql, params, (err, results) => {
       connection.release(); // Release connection after query
       if (err) return callback(err, null);

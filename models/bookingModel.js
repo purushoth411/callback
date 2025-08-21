@@ -584,94 +584,93 @@ const checkConsultantCompletedCall = (
       ORDER BY id DESC LIMIT 1
     `;
 
-    connection.query(
-      sql,
-      [consultantId, clientEmail, saleType],
-      (err, results) => {
+    connection.query(sql, [consultantId, clientEmail, saleType], (err, results) => {
+      if (err) {
+        connection.release();
+        return callback(err);
+      }
+
+      if (results.length === 0) {
+        connection.release();
+        return callback(null, "call not completed");
+      }
+
+      const result1 = results[0];
+      const bookingId = result1.id;
+      const bookingTeamIds = result1.fld_teamid
+        .split(",")
+        .map((id) => id.trim()); // booking teams as array
+
+      const adminSql = `SELECT fld_team_id FROM tbl_admin WHERE id = ?`;
+
+      connection.query(adminSql, [loginCrmId], (err, adminResults) => {
         if (err) {
           connection.release();
           return callback(err);
         }
 
-        if (results.length === 0) {
+        const loginTeamIds = adminResults[0]?.fld_team_id
+          .split(",")
+          .map((id) => id.trim()); // user teams as array
+
+        // Check if any booking team matches any CRM team
+        const isTeamMatch = bookingTeamIds.some((id) => loginTeamIds.includes(id));
+
+        if (isTeamMatch) {
           connection.release();
-          return callback(null, "call not completed");
+          return callback(null, "add call");
         }
 
-        const result1 = results[0];
-        const bookingId = result1.id;
-        const teamId = result1.fld_teamid;
-
-        const adminSql = `SELECT fld_team_id FROM tbl_admin WHERE id = ?`;
-
-        connection.query(adminSql, [loginCrmId], (err, adminResults) => {
-          if (err) {
-            connection.release();
-            return callback(err);
-          }
-
-          const loginTeamId = adminResults[0]?.fld_team_id;
-
-          if (loginTeamId === teamId) {
-            connection.release();
-            return callback(null, "add call");
-          }
-
-          const historySql = `
+        const historySql = `
           SELECT fld_call_completed_date FROM tbl_booking_sts_history 
           WHERE fld_booking_id = ? AND status = 'Completed' 
           ORDER BY id DESC LIMIT 1
         `;
 
-          connection.query(historySql, [bookingId], (err, historyResults) => {
-            if (err) {
-              connection.release();
-              return callback(err);
-            }
+        connection.query(historySql, [bookingId], (err, historyResults) => {
+          if (err) {
+            connection.release();
+            return callback(err);
+          }
 
-            let callCompletedDate =
-              historyResults.length > 0
-                ? historyResults[0].fld_call_completed_date
-                : null;
+          let callCompletedDate =
+            historyResults.length > 0
+              ? historyResults[0].fld_call_completed_date
+              : null;
 
-            if (!callCompletedDate) {
-              const overallSql = `
+          if (!callCompletedDate) {
+            const overallSql = `
               SELECT fld_addedon FROM tbl_booking_overall_history 
               WHERE fld_booking_id = ? AND fld_comment LIKE '%Call Completed by%' 
               ORDER BY id DESC LIMIT 1
             `;
 
-              connection.query(
-                overallSql,
-                [bookingId],
-                (err, overallResults) => {
-                  connection.release();
-                  if (err) return callback(err);
-
-                  if (overallResults.length === 0) {
-                    return callback(null, "call not completed");
-                  }
-
-                  const callDate = overallResults[0].fld_addedon;
-                  const msg = `Call completed with client ${result1.fld_name} by consultant ${consultantId} on date ${callDate}`;
-                  return callback(
-                    null,
-                    `${msg}||${result1.fld_consultantid}||${consultantId}`
-                  );
-                }
-              );
-            } else {
+            connection.query(overallSql, [bookingId], (err, overallResults) => {
               connection.release();
-              const msg = `Call completed with client ${result1.fld_name} by consultant ${consultantId} on date ${callCompletedDate}`;
+              if (err) return callback(err);
+
+              if (overallResults.length === 0) {
+                return callback(null, "call not completed");
+              }
+
+              const callDate = overallResults[0].fld_addedon;
+              const msg = `Call completed with client ${result1.fld_name} by consultant ${consultantId} on date ${callDate}`;
               return callback(
                 null,
                 `${msg}||${result1.fld_consultantid}||${consultantId}`
               );
-            }
-          });
+            });
+          } else {
+            connection.release();
+            const msg = `Call completed with client ${result1.fld_name} by consultant ${consultantId} on date ${callCompletedDate}`;
+            return callback(
+              null,
+              `${msg}||${result1.fld_consultantid}||${consultantId}`
+            );
+          }
         });
-      }
-    );
+      });
+    });
   });
 };
 
@@ -1797,11 +1796,13 @@ const checkConflictingBookings = (
 const fetchSummaryBookings = (
   userId,
   userType,
+  subadminType = null ,
   assignedTeam,
   filters,
   type,
   page = 1,
   callback
+  // Add subadminType parameter
 ) => {
   const currentDate = moment().format("YYYY-MM-DD");
   const nextDay = moment().add(1, "day").format("YYYY-MM-DD");
@@ -2098,67 +2099,110 @@ const fetchSummaryBookings = (
   };
 
   const handleUserTypeAccess = (connection) => {
-    // Handle SUBADMIN team filtering
-    if (userType === "SUBADMIN") {
-      const statusCondition = ` AND (
-        b.fld_call_request_sts = 'Pending' OR
-        b.fld_call_request_sts = 'Completed' OR
-        b.fld_call_request_sts = 'Rescheduled' OR
-        b.fld_call_request_sts = 'Call Rescheduled' OR
-        b.fld_call_request_sts = 'Reject' OR
-        b.fld_call_request_sts = 'Accept' OR
-        b.fld_call_request_sts = 'Cancelled' OR
-        b.fld_call_request_sts = 'Client did not join' OR
-        b.fld_call_request_sts = 'Consultant Assigned' OR
-        b.fld_call_request_sts = 'Call Scheduled'
-      )`;
-
-      sql += statusCondition;
-      countSql += statusCondition;
-
-      if (assignedTeam) {
-        const teamIds = assignedTeam
-          .split(",")
-          .map((id) => id.trim())
-          .filter(Boolean);
-        const teamConditions = teamIds
-          .map(() => "FIND_IN_SET(?, b.fld_teamid)")
-          .join(" OR ");
-        const teamCondition = ` AND (b.fld_consultantid = ? OR ${teamConditions})`;
-        sql += teamCondition;
-        countSql += teamCondition;
-        params.push(userId, ...teamIds);
-        countParams.push(userId, ...teamIds);
-      } else {
-        const consultantCondition = ` AND b.fld_consultantid = ?`;
-        sql += consultantCondition;
-        countSql += consultantCondition;
-        params.push(userId);
-        countParams.push(userId);
-      }
-
+    // Handle SUPERADMIN access - has access to all bookings
+    if (userType === "SUPERADMIN") {
       executeQuery(connection);
     }
-    // Handle CONSULTANT access
-    else if (userType === "CONSULTANT" && filters.segment4 !== "follower") {
-      const consultantCondition = ` AND b.fld_consultantid = ?`;
-      sql += consultantCondition;
-      countSql += consultantCondition;
-      params.push(userId);
-      countParams.push(userId);
+    // Handle SUBADMIN access based on teams and subadmin type
+    else if (userType === "SUBADMIN" && assignedTeam) {
+      const teamIds = assignedTeam
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+
+      if (subadminType === "consultant_sub") {
+        // Only fetch bookings for consultants in assigned teams
+        if (teamIds.length > 0) {
+          const placeholders = teamIds
+            .map(() => "FIND_IN_SET(?, a.fld_team_id)")
+            .join(" OR ");
+          const adminQuery = `SELECT id FROM tbl_admin a WHERE ${placeholders}`;
+
+          connection.query(adminQuery, teamIds, (err, adminRows) => {
+            if (err) {
+              connection.release();
+              return callback(err);
+            }
+
+            const consultantIds = adminRows.map((row) => row.id);
+            if (consultantIds.length === 0) {
+              connection.release();
+              return callback(null, []);
+            }
+
+            const uidPlaceholders = consultantIds.map(() => "?").join(",");
+            sql += ` AND b.fld_consultantid IN (${uidPlaceholders})`;
+            countSql += ` AND b.fld_consultantid IN (${uidPlaceholders})`;
+            params.push(...consultantIds);
+            countParams.push(...consultantIds);
+
+            executeQuery(connection);
+          });
+        } else {
+          const consultantCondition = ` AND b.fld_consultantid = ?`;
+          sql += consultantCondition;
+          countSql += consultantCondition;
+          params.push(userId);
+          countParams.push(userId);
+          executeQuery(connection);
+        }
+      } else {
+        // Other SUBADMINs: fetch bookings added by them or their team members
+        if (teamIds.length > 0) {
+          const placeholders = teamIds
+            .map(() => "FIND_IN_SET(?, a.fld_team_id)")
+            .join(" OR ");
+          const adminQuery = `SELECT id FROM tbl_admin a WHERE ${placeholders}`;
+
+          connection.query(adminQuery, teamIds, (err, adminRows) => {
+            if (err) {
+              connection.release();
+              return callback(err);
+            }
+
+            const adminIds = adminRows.map((row) => row.id);
+            const uniqueUserIds = [...new Set([...adminIds, userId])];
+
+            if (uniqueUserIds.length === 0) {
+              connection.release();
+              return callback(null, []);
+            }
+
+            const uidPlaceholders = uniqueUserIds.map(() => "?").join(",");
+            const condition = ` AND (b.fld_consultantid IN (${uidPlaceholders}) OR b.fld_addedby IN (${uidPlaceholders}))`;
+            sql += condition;
+            countSql += condition;
+            params.push(...uniqueUserIds, ...uniqueUserIds);
+            countParams.push(...uniqueUserIds, ...uniqueUserIds);
+
+            executeQuery(connection);
+          });
+        } else {
+          const condition = ` AND (b.fld_consultantid = ? OR b.fld_addedby = ?)`;
+          sql += condition;
+          countSql += condition;
+          params.push(userId, userId);
+          countParams.push(userId, userId);
+          executeQuery(connection);
+        }
+      }
+    }
+    // Handle CONSULTANT access - skip consultant assigned and postponed
+    else if (userType === "CONSULTANT") {
+      const condition = ` AND b.fld_consultantid = ? AND b.fld_call_request_sts NOT IN (?, ?)`;
+      sql += condition;
+      countSql += condition;
+      params.push(userId, "Consultant Assigned", "Postponed");
+      countParams.push(userId, "Consultant Assigned", "Postponed");
       executeQuery(connection);
     }
     // Handle EXECUTIVE access
-    else if (userType === "EXECUTIVE" && !filters.bookingId) {
-      const executiveCondition = ` AND b.fld_addedby = ?`;
-      sql += executiveCondition;
-      countSql += executiveCondition;
+    else if (userType === "EXECUTIVE") {
+      const condition = ` AND b.fld_addedby = ?`;
+      sql += condition;
+      countSql += condition;
       params.push(userId);
       countParams.push(userId);
-      executeQuery(connection);
-    }
-    // Handle SUPERADMIN access
-    else if (userType === "SUPERADMIN") {
       executeQuery(connection);
     }
     // Fallback - no access

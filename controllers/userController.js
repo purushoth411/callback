@@ -19,7 +19,9 @@ const loginUser = (req, res) => {
         if (!user) {
             return res.status(401).json({ status : false , message: 'Invalid Username' });
         }
-        
+        if(user.status === 'Inactive') {
+        return res.status(401).json({ status : false , message: 'Your Account is Inactive' });
+        }
          if (String(user.fld_decrypt_password) !== String(userpass)) {
       return res.status(400).json({ status: false, message: "Invalid Password" });
     }
@@ -172,7 +174,7 @@ const updateUser = (req, res) => {
         username,
         name,
         email,
-        phone,
+        
         consultant_type,
         subadmin_type,
         permissions: JSON.stringify(permissions || {}),

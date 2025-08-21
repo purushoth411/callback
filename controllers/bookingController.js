@@ -2855,63 +2855,70 @@ const checkCompletedCall = (req, res) => {
       const booking = bookings[0];
       const bookingId = booking.id;
       const clientName = booking.fld_name;
-      const teamId = booking.fld_teamid;
+      const bookingTeamIds = booking.fld_teamid
+        .split(",")
+        .map((id) => id.trim()); // booking teams as array
       const bookingConsultantId = booking.fld_consultantid;
 
-      // Get current logged-in CRM team ID
-      bookingModel.getAdminById(
-        user.fld_consultantid,
-        (err, consultantData) => {
-          if (err || !consultantData)
-            return res.status(500).send("consultant fetch error");
+      // Get current logged-in CRM team IDs (comma-separated string)
+      bookingModel.getAdminById(user.fld_consultantid, (err, consultantData) => {
+        if (err || !consultantData)
+          return res.status(500).send("consultant fetch error");
 
-          const currentCrmTeamId = user.fld_team_id;
-          const consultantName = consultantData.fld_name;
+        const currentCrmTeamIds = user.fld_team_id
+          .split(",")
+          .map((id) => id.trim()); // user teams as array
 
-          if (teamId !== currentCrmTeamId) {
-            // Team doesn't match, check if call completed
-            bookingModel.getLatestCompletedBookingStatusHistory(
-              bookingId,
-              "Completed",
-              (err, statusHist) => {
-                const completedDate = statusHist?.[0]?.fld_call_completed_date;
+        const consultantName = consultantData.fld_name;
 
-                if (completedDate) {
-                  const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment
-                    .tz(completedDate, "Asia/Kolkata")
-                    .format("D MMM YYYY")}`;
-                  return res.send(
-                    `${msg}||${bookingConsultantId}||${primaryConsultantId}`
-                  );
-                }
+        // Check if any booking team ID exists in user team IDs
+        const isTeamMatch = bookingTeamIds.some((id) =>
+          currentCrmTeamIds.includes(id)
+        );
 
-                // Fallback: Check overall history
-                bookingModel.getLatestCompletedBookingHistory(
-                  bookingId,
-                  (err, overallHist) => {
-                    const historyRow = overallHist?.[0];
-                    const fallbackDate = historyRow?.fld_addedon;
+        if (!isTeamMatch) {
+          // Team doesn't match, check if call completed
+          bookingModel.getLatestCompletedBookingStatusHistory(
+            bookingId,
+            "Completed",
+            (err, statusHist) => {
+              const completedDate = statusHist?.[0]?.fld_call_completed_date;
 
-                    if (fallbackDate) {
-                      const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment
-                        .tz(fallbackDate, "Asia/Kolkata")
-                        .format("D MMM YYYY")}`;
-                      return res.send(
-                        `${msg}||${historyRow.fld_consultantid}||${primaryConsultantId}`
-                      );
-                    } else {
-                      return res.send("call not completed");
-                    }
-                  }
+              if (completedDate) {
+                const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment
+                  .tz(completedDate, "Asia/Kolkata")
+                  .format("D MMM YYYY")}`;
+                return res.send(
+                  `${msg}||${bookingConsultantId}||${primaryConsultantId}`
                 );
               }
-            );
-          } else {
-            // Same team, allow call addition
-            return res.send("add call");
-          }
+
+              // Fallback: Check overall history
+              bookingModel.getLatestCompletedBookingHistory(
+                bookingId,
+                (err, overallHist) => {
+                  const historyRow = overallHist?.[0];
+                  const fallbackDate = historyRow?.fld_addedon;
+
+                  if (fallbackDate) {
+                    const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment
+                      .tz(fallbackDate, "Asia/Kolkata")
+                      .format("D MMM YYYY")}`;
+                    return res.send(
+                      `${msg}||${historyRow.fld_consultantid}||${primaryConsultantId}`
+                    );
+                  } else {
+                    return res.send("call not completed");
+                  }
+                }
+              );
+            }
+          );
+        } else {
+          // Same team, allow call addition
+          return res.send("add call");
         }
-      );
+      });
     }
   );
 };
@@ -3252,6 +3259,7 @@ const fetchSummaryBookings = (req, res) => {
   const payload = req.body.filterPayload || {};
   const userId = payload.userId;
   const userType = payload.userType;
+  const subadminType  = payload.subadminType ;
   const assignedTeam = payload.assigned_team;
   const filters = payload.filters || {};
   const dashboard_status = payload.dashboard_status || null;
@@ -3277,6 +3285,7 @@ const fetchSummaryBookings = (req, res) => {
   bookingModel.fetchSummaryBookings(
     userId,
     userType,
+    subadminType,
     assignedTeam,
     filters,
     type,

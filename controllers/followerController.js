@@ -24,7 +24,9 @@ const getAllActiveFollowers = (req, res) => {
 };
 
 const getAllFollowers = (req, res) => {
-  followerModel.getAllFollowers((err, Followers) => {
+  const { usertype, userid } = req.query; // pass userid from frontend too
+
+  followerModel.getAllFollowers(usertype, userid, (err, Followers) => {
     if (err) {
       console.error("Error fetching Followers:", err);
       return res.status(500).json({ status: false, message: "Server error" });
@@ -100,8 +102,25 @@ const currentTime = moment().tz("Asia/Kolkata");
     });
 };
 
+const fetchPendingFollowerCallsCount = (req, res) => {
+  const { usertype, userid } = req.query;
+
+  followerModel.getPendingFollowerCallsCount(usertype, userid, (err, result) => {
+    if (err) {
+      console.error("Error fetching pending follower calls:", err);
+      return res.status(500).json({ status: false, message: "Server error" });
+    }
+
+    return res.json({
+      status: true,
+      data: result.pendingCount || 0,
+    });
+  });
+};
+
 module.exports = {
   getAllActiveFollowers,
   getAllFollowers,
-  followerclaimbooking
+  followerclaimbooking,
+  fetchPendingFollowerCallsCount,
 };
