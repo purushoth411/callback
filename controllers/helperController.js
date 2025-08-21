@@ -789,7 +789,7 @@ const addFollower = (req, res) => {
             .json({ status: false, message: "Follower already added" });
         }
 
-        // ✅ fetch follower details
+        // ✅ fetch follower consultant details
         bookingModel.getAdminById(followerConsultantId, (err, follower) => {
           if (err || !follower) {
             return res.status(500).json({
@@ -806,6 +806,7 @@ const addFollower = (req, res) => {
             addedon,
           };
 
+          // ✅ Insert follower
           helperModel.insertFollower(followerData, (err, insertId) => {
             if (err || !insertId) {
               return res.status(500).json({
@@ -814,7 +815,10 @@ const addFollower = (req, res) => {
               });
             }
 
-            const comment = `${user.fld_admin_type} ${user.fld_name} added ${follower.fld_name} as a follower on ${getFormattedDate()} at ${getFormattedTime()}`;
+            // ✅ Insert booking history
+            const comment = `${user.fld_admin_type} ${user.fld_name} added ${
+              follower.fld_name
+            } as a follower on ${getFormattedDate()} at ${getFormattedTime()}`;
 
             const historyData = {
               fld_booking_id: bookingid,
@@ -831,40 +835,65 @@ const addFollower = (req, res) => {
                 });
               }
 
-              emitBookingUpdate(bookingid);
+              // ✅ Fetch full follower row and emit
+              helperModel.getFollowerByID(insertId, (err, fullFollowerRow) => {
+                if (err || !fullFollowerRow) {
+                  return res.status(500).json({
+                    status: false,
+                    message: "Failed to fetch inserted follower row",
+                  });
+                }
 
-              try {
-                if (follower.fld_email) {
-                  const link = `${process.env.BASE_URL}/followers`;
-                  const message = `${user.fld_name} added you as a follower for the call with client ${bookingRow.fld_name} <br/> 
+                const io = getIO();
+                io.emit("followerAdded", fullFollowerRow); // send full details
+
+                emitBookingUpdate(bookingid);
+
+                // ✅ Send notification email (loop update)
+                try {
+                  if (follower.fld_email) {
+                    const link = `${process.env.BASE_URL}/followers`;
+                    const formatType = (type) => {
+                      if (!type) return "";
+                      return (
+                        type.charAt(0).toUpperCase() +
+                        type.slice(1).toLowerCase()
+                      );
+                    };
+
+                    const message = `${formatType(user.fld_admin_type)} ${
+                      user.fld_name
+                    } added you as a follower to the ${
+                      bookingRow.fld_sale_type
+                    } call with client ${bookingRow.fld_name} - Booking id <b>${
+                      bookingRow.fld_bookingcode
+                    }</b> <br/> 
 <a href="${link}" target="_blank" class="view-task-btn">Go To Follower Calls</a>`;
 
-                  axios.post(
-                    "https://webexback-06cc.onrender.com/api/users/send-loop-updates",
-                    {
-                      email: follower.fld_email,
-                      message,
-                    }
-                  );
+                    axios.post(
+                      "https://webexback-06cc.onrender.com/api/users/send-cc-updates",
+                      {
+                        email: follower.fld_email,
+                        message,
+                      }
+                    );
 
-                  console.log(`Loop update sent to ${follower.fld_email}`);
-                } else {
-                  console.warn("No follower email found for loop update");
+                    console.log(`Loop update sent to ${follower.fld_email}`);
+                  } else {
+                    console.warn("No follower email found for loop update");
+                  }
+                } catch (err) {
+                  console.error("Failed to send loop update:", err.message);
                 }
-              } catch (err) {
-                console.error("Failed to send loop update:", err.message);
-              }
 
-              return res.status(200).json({
-                status: true,
-                message: "Follower added successfully",
-                followerId: insertId,
-                historyId: historyId,
-                followerDetails: {
-                  id: follower.id,
-                  name: follower.fld_name,
-                  email: follower.fld_email,
-                },
+                // ✅ Final response
+                return res.status(200).json({
+                  status: true,
+                  message: "Follower added successfully",
+                  followerId: insertId,
+                  historyId: historyId,
+                  followerDetails: fullFollowerRow, // full row back to client
+                });
               });
             });
           });
@@ -873,7 +902,6 @@ const addFollower = (req, res) => {
     );
   });
 };
-
 
 const updateExternalBookingInfo = (req, res) => {
   const {
@@ -1261,11 +1289,11 @@ const validateOtp = (req, res) => {
                                   try {
                                     if (crmDetails.fld_email) {
                                       const link = `${process.env.BASE_URL}/admin/booking_detail/${row.id}`;
-                                      const message = `Your call with the client <b>${row.fld_name}</b> has been <strong>cancelled and to be rescheduled</strong> as the client did not confirm.<br/> 
+                                      const message = `Your ${row.fld_sale_type} request with Booking id <b>${row.fld_bookingcode}</b> for client ${row.fld_name} has been <strong>cancelled and to be rescheduled</strong> as the client did not confirm.<br/> 
 <a href="${link}" target="_blank" class="view-task-btn">View Booking</a>`;
 
                                       axios.post(
-                                        "https://webexback-06cc.onrender.com/api/users/send-loop-updates",
+                                        "https://webexback-06cc.onrender.com/api/users/send-cc-updates",
                                         {
                                           email: crmDetails.fld_email,
                                           message,
@@ -1341,11 +1369,11 @@ const validateOtp = (req, res) => {
                       try {
                         if (crmDetails.fld_email) {
                           const link = `${process.env.BASE_URL}/admin/booking_detail/${booking_id}`;
-                          const message = `Your call with the client <b>${bookingInfo.fld_name}</b> has been confirmed by client.<br/> 
+                          const message = `Your ${bookingInfo.fld_sale_type} request with Booking id <b>${bookingInfo.fld_bookingcode}</b> for client ${bookingInfo.fld_name} has been confirmed by client.<br/> 
 <a href="${link}" target="_blank" class="view-task-btn">View Booking</a>`;
 
                           axios.post(
-                            "https://webexback-06cc.onrender.com/api/users/send-loop-updates",
+                            "https://webexback-06cc.onrender.com/api/users/send-cc-updates",
                             {
                               email: crmDetails.fld_email,
                               message,

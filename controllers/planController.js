@@ -2,6 +2,7 @@
 const planModel = require("../models/planModel");
 const db = require("../config/db");
 const moment = require('moment-timezone');
+const { getIO } = require("../socket");
 
 
 const getAllActivePlans = (req, res) => {
@@ -36,29 +37,36 @@ const getAllPlans = (req, res) => {
 
 const updatePlan = (req, res) => {
   const id = req.params.id;
-  const PlanData = req.body;
-  if (!PlanData.plan) {
+  const planData = req.body;
+
+  if (!planData.plan) {
     return res
       .status(400)
       .json({ status: false, message: "Plan name is required" });
   }
 
-  if (!PlanData.allowedCalls) {
+  if (!planData.allowedCalls) {
     return res
       .status(400)
       .json({ status: false, message: "Allowed Calls is required" });
   }
 
-  planModel.updatePlan(id, PlanData, (err, result) => {
+  planModel.updatePlan(id, planData, (err, result) => {
     if (err) {
       console.error("Update Plan error:", err);
       return res
         .status(500)
         .json({ status: false, message: "Database error while updating Plan" });
     }
+
+    const io = getIO();
+   
+    io.emit("planUpdated", { id, ...planData });
+
     return res.json({ status: true, message: "Plan updated successfully" });
   });
 };
+
 
 
 

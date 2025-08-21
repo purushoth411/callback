@@ -195,11 +195,46 @@ const viewExternalCalls = async ({ session_user_id, session_user_type, bookingid
   });
 };
 
+const getExternalCallByBookingId = (bookingid, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err);
+
+    let sql = `
+      SELECT 
+        tbl_external_calls.*, 
+        tbl_booking.fld_call_related_to,
+        tbl_booking.fld_sale_type,
+        tbl_booking.fld_booking_date,
+        tbl_booking.fld_booking_slot,
+        tbl_booking.id as bookingid,
+        tbl_booking.fld_client_id,
+        consultant_admin.fld_name AS consultant_name,
+        tbl_user.fld_email AS user_email,
+        tbl_user.fld_name AS user_name,
+        crm_admin.fld_name AS crm_name
+      FROM tbl_external_calls
+      INNER JOIN tbl_booking ON tbl_external_calls.fld_booking_id = tbl_booking.id
+      LEFT JOIN tbl_admin AS consultant_admin ON tbl_booking.fld_consultantid = consultant_admin.id
+      LEFT JOIN tbl_user ON tbl_booking.fld_userid = tbl_user.id
+      LEFT JOIN tbl_admin AS crm_admin ON tbl_external_calls.fld_call_added_by = crm_admin.id
+      WHERE tbl_external_calls.fld_booking_id = ?  
+      ORDER BY tbl_external_calls.id DESC
+      LIMIT 1
+    `;
+
+    connection.query(sql, [bookingid], (error, results) => {
+      connection.release();
+      if (error) return callback(error);
+      callback(null, results.length ? results[0] : null);
+    });
+  });
+};
 
 
 
 module.exports = {
     getRcCallBookingRequest,
    // getWritersByProjectSegment,
-    viewExternalCalls
+    viewExternalCalls,
+    getExternalCallByBookingId
 }

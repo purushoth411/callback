@@ -12,6 +12,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { getIO } = require("../socket");
+const additionalModel = require("../models/additionalModel");
 
 function getCurrentDate(format = "YYYY-MM-DD") {
   return moment().tz("Asia/Kolkata").format(format);
@@ -502,7 +503,7 @@ const insertCallRequest = (req, res) => {
                       sale_type === "Postsales" &&
                       allowedCalls !== "Unlimited"
                     ) {
-                      logger.info(`This is a Request Call `);
+                      logger.info(`This is a Request Call`);
 
                       const addCallRequestData = {
                         bookingId: bookingId,
@@ -512,17 +513,19 @@ const insertCallRequest = (req, res) => {
                         addedon: getCurrentDate("YYYY-MM-DD"),
                       };
 
-                      bookingModel.insertAddCallRequest(
-                        addCallRequestData,
-                        (err) => {
-                          if (err)
-                            return res.status(500).json({
-                              status: false,
-                              message: "Add call request insert failed",
-                            });
+                      bookingModel.insertAddCallRequest(addCallRequestData, (err) => {
+                        if (err) {
+                          return res.status(500).json({
+                            status: false,
+                            message: "Add call request insert failed",
+                          });
                         }
-                      );
+
+                        
+                        emitAddCallRequestAdded(bookingId);
+                      });
                     }
+
 
                     // STEP 9: Update RC call request status
                     if (call_request_id && rc_call_request_id) {
@@ -697,6 +700,10 @@ const insertCallRequest = (req, res) => {
                         const newBooking = bookingRows[0];
                         const io = getIO();
                         io.emit("bookingAdded", newBooking);
+
+                        if (newBooking.fld_call_external_assign == "Yes") {
+                          emitExternalCallAdded(bookingId);
+                        }
 
                         return res.status(200).json({
                           status: true,
@@ -1280,12 +1287,12 @@ function sendRescheduleMail({ booking, oldDateTime, newDateTime }, callback) {
   try {
     if (bcc) {
       const link = `${process.env.BASE_URL}/admin/booking_detail/${booking.id}`;
-      const message = `Your call with the client <b>${clientName}</b> has been rescheduled to 
+      const message = `Your ${booking.fld_sale_type} request with Booking id <b>${booking.fld_bookingcode}</b> for client ${clientName} has been rescheduled to 
         <b>${newDate.format("ddd MMM DD, YYYY hh:mm A")}</b>.<br/>
         <a href="${link}" target="_blank" class="view-task-btn">View Booking</a>`;
 
       axios.post(
-        "https://webexback-06cc.onrender.com/api/users/send-loop-updates",
+        "https://webexback-06cc.onrender.com/api/users/send-cc-updates",
         {
           email: bcc,
           message,
@@ -1720,11 +1727,13 @@ async function sendConfirmationEmail(booking, res) {
         try {
           if (crm.fld_email) {
             const link = `${process.env.BASE_URL}/admin/booking_detail/${booking.id}`;
-            const message = `Your call with the client <b>${booking.fld_name}</b> has been confirmed.<br/>
+
+        
+            const message = `Your ${booking.fld_sale_type} request with Booking id <b>${booking.fld_bookingcode}</b> for client ${booking.fld_name} has been confirmed.<br/>
               <a href="${link}" target="_blank" class="view-task-btn">View Booking</a>`;
 
             await axios.post(
-              "https://webexback-06cc.onrender.com/api/users/send-loop-updates",
+              "https://webexback-06cc.onrender.com/api/users/send-cc-updates",
               {
                 email: crm.fld_email,
                 message,
@@ -2503,11 +2512,15 @@ const handleEmailNotifications = (
             try {
               if (crmInfo.fld_email) {
                 const link = `${process.env.BASE_URL}/admin/booking_detail/${booking.id}`;
-                const message = `Your call with the client <b>${booking.fld_name}</b> has been ${consultation_sts}.<br/> 
+                let statusText=consultation_sts;
+                if(consultation_sts=="Accept" || consultation_sts=="Reject"){
+                    statusText= consultation_sts+"ed";
+                }
+                const message = `Your ${booking.fld_sale_type} request with Booking id <b>${booking.fld_bookingcode}</b> for client ${booking.fld_name} has been ${statusText}.<br/> 
 <a href="${link}" target="_blank" class="view-task-btn">View Booking</a>`;
 
                 axios.post(
-                  "https://webexback-06cc.onrender.com/api/users/send-loop-updates",
+                  "https://webexback-06cc.onrender.com/api/users/send-cc-updates",
                   {
                     email: crmInfo.fld_email,
                     message,
@@ -2861,64 +2874,67 @@ const checkCompletedCall = (req, res) => {
       const bookingConsultantId = booking.fld_consultantid;
 
       // Get current logged-in CRM team IDs (comma-separated string)
-      bookingModel.getAdminById(user.fld_consultantid, (err, consultantData) => {
-        if (err || !consultantData)
-          return res.status(500).send("consultant fetch error");
+      bookingModel.getAdminById(
+        user.fld_consultantid,
+        (err, consultantData) => {
+          if (err || !consultantData)
+            return res.status(500).send("consultant fetch error");
 
-        const currentCrmTeamIds = user.fld_team_id
-          .split(",")
-          .map((id) => id.trim()); // user teams as array
+          const currentCrmTeamIds = user.fld_team_id
+            .split(",")
+            .map((id) => id.trim()); // user teams as array
 
-        const consultantName = consultantData.fld_name;
+          const consultantName = consultantData.fld_name;
 
-        // Check if any booking team ID exists in user team IDs
-        const isTeamMatch = bookingTeamIds.some((id) =>
-          currentCrmTeamIds.includes(id)
-        );
+          // Check if any booking team ID exists in user team IDs
+          const isTeamMatch = bookingTeamIds.some((id) =>
+            currentCrmTeamIds.includes(id)
+          );
 
-        if (!isTeamMatch) {
-          // Team doesn't match, check if call completed
-          bookingModel.getLatestCompletedBookingStatusHistory(
-            bookingId,
-            "Completed",
-            (err, statusHist) => {
-              const completedDate = statusHist?.[0]?.fld_call_completed_date;
+          if (!isTeamMatch) {
+            // Team doesn't match, check if call completed
+            bookingModel.getLatestCompletedBookingStatusHistory(
+              bookingId,
+              "Completed",
+              (err, statusHist) => {
+                const completedDate = statusHist?.[0]?.fld_call_completed_date;
 
-              if (completedDate) {
-                const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment
-                  .tz(completedDate, "Asia/Kolkata")
-                  .format("D MMM YYYY")}`;
-                return res.send(
-                  `${msg}||${bookingConsultantId}||${primaryConsultantId}`
+                if (completedDate) {
+                  const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment
+                    .tz(completedDate, "Asia/Kolkata")
+                    .format("D MMM YYYY")}`;
+                  return res.send(
+                    `${msg}||${bookingConsultantId}||${primaryConsultantId}`
+                  );
+                }
+
+                // Fallback: Check overall history
+                bookingModel.getLatestCompletedBookingHistory(
+                  bookingId,
+                  (err, overallHist) => {
+                    const historyRow = overallHist?.[0];
+                    const fallbackDate = historyRow?.fld_addedon;
+
+                    if (fallbackDate) {
+                      const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment
+                        .tz(fallbackDate, "Asia/Kolkata")
+                        .format("D MMM YYYY")}`;
+                      return res.send(
+                        `${msg}||${historyRow.fld_consultantid}||${primaryConsultantId}`
+                      );
+                    } else {
+                      return res.send("call not completed");
+                    }
+                  }
                 );
               }
-
-              // Fallback: Check overall history
-              bookingModel.getLatestCompletedBookingHistory(
-                bookingId,
-                (err, overallHist) => {
-                  const historyRow = overallHist?.[0];
-                  const fallbackDate = historyRow?.fld_addedon;
-
-                  if (fallbackDate) {
-                    const msg = `Call completed with client ${clientName} by consultant ${consultantName} on date ${moment
-                      .tz(fallbackDate, "Asia/Kolkata")
-                      .format("D MMM YYYY")}`;
-                    return res.send(
-                      `${msg}||${historyRow.fld_consultantid}||${primaryConsultantId}`
-                    );
-                  } else {
-                    return res.send("call not completed");
-                  }
-                }
-              );
-            }
-          );
-        } else {
-          // Same team, allow call addition
-          return res.send("add call");
+            );
+          } else {
+            // Same team, allow call addition
+            return res.send("add call");
+          }
         }
-      });
+      );
     }
   );
 };
@@ -3259,7 +3275,7 @@ const fetchSummaryBookings = (req, res) => {
   const payload = req.body.filterPayload || {};
   const userId = payload.userId;
   const userType = payload.userType;
-  const subadminType  = payload.subadminType ;
+  const subadminType = payload.subadminType;
   const assignedTeam = payload.assigned_team;
   const filters = payload.filters || {};
   const dashboard_status = payload.dashboard_status || null;
@@ -3442,6 +3458,29 @@ function emitRcBookingUpdate(callRequestId) {
     }
   );
 }
+
+function emitExternalCallAdded(bookingId) {
+  additionalModel.getExternalCallByBookingId(bookingId, (err, externalCall) => {
+    if (!err && externalCall) {
+      const io = getIO();
+      io.emit("externalBookingAdded", externalCall);
+    } else if (err) {
+      console.error("emitExternalCallAdded error:", err);
+    }
+  });
+}
+
+function emitAddCallRequestAdded(bookingId) {
+  helperModel.getAddCallRequestById(bookingId, (err, addCall) => {
+    if (!err && addCall) {
+      const io = getIO();
+      io.emit("addCallAdded", addCall);
+    } else if (err) {
+      console.error("addCallAdded error:", err);
+    }
+  });
+}
+
 
 const getConsultantTeamBookings = (req, res) => {
   const { userId } = req.query;

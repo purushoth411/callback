@@ -809,7 +809,83 @@ const getSubjectAreasByConsultantName = (consultantName, callback) => {
   db.query(query, [consultantName.replace(/\s+/g, '')], callback);
 };
 
+const getFollowerByID = (followerId, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err, null);
 
+    let sql = `
+      SELECT 
+        tbl_follower.id as followerid, 
+        tbl_follower.bookingid,
+        tbl_follower.follower_consultant_id,
+        tbl_follower.consultantid,
+        tbl_follower.addedon, 
+        tbl_follower.status as followstatus, 
+        tbl_booking.*, 
+        addedby.fld_name as admin_name, 
+        addedby.fld_email as admin_email, 
+        consultant.fld_name as consultant_name, 
+        tbl_user.fld_user_code as user_code, 
+        tbl_user.fld_name as user_name, 
+        tbl_user.fld_email as user_email, 
+        tbl_user.fld_decrypt_password as user_pass, 
+        tbl_user.fld_country_code as user_country_code, 
+        tbl_user.fld_phone as user_phone, 
+        tbl_user.fld_address, 
+        tbl_user.fld_city, 
+        tbl_user.fld_pincode, 
+        tbl_user.fld_country 
+      FROM tbl_follower 
+      JOIN tbl_booking ON tbl_booking.id = tbl_follower.bookingid 
+      LEFT JOIN tbl_admin as addedby ON tbl_booking.fld_addedby = addedby.id 
+      LEFT JOIN tbl_admin as consultant ON tbl_booking.fld_consultantid = consultant.id 
+      JOIN tbl_user ON tbl_booking.fld_userid = tbl_user.id
+      WHERE tbl_follower.id = ?
+    `;
+
+    connection.query(sql, [followerId], (queryErr, results) => {
+      connection.release();
+      if (queryErr) return callback(queryErr, null);
+      return callback(null, results[0] || null);
+    });
+  });
+};
+
+const getAddCallRequestByBookingId = (bookingId, callback) => {
+  db.getConnection((err, connection) => {
+    if (err) return callback(err, null);
+
+    const sql = `
+      SELECT 
+        tbl_approve_addcall_request.*, 
+        tbl_booking.fld_name AS client_name, 
+        tbl_booking.fld_client_id AS client_code, 
+        tbl_plan.plan AS planName, 
+        addedby.id AS crm_id, 
+        addedby.fld_name AS crm_name, 
+        tbl_admin.fld_name AS admin_name, 
+        tbl_admin.fld_email AS admin_email
+      FROM tbl_approve_addcall_request
+      JOIN tbl_booking 
+        ON tbl_approve_addcall_request.bookingId = tbl_booking.id
+      JOIN tbl_plan 
+        ON tbl_approve_addcall_request.planId = tbl_plan.id
+      LEFT JOIN tbl_admin 
+        ON tbl_booking.fld_consultantid = tbl_admin.id
+      LEFT JOIN tbl_admin AS addedby 
+        ON tbl_booking.fld_addedby = addedby.id
+      WHERE tbl_approve_addcall_request.bookingId = ?
+      ORDER BY tbl_approve_addcall_request.id DESC
+      LIMIT 1
+    `;
+
+    connection.query(sql, [bookingId], (queryErr, results) => {
+      connection.release();
+      if (queryErr) return callback(queryErr, null);
+      return callback(null, results.length > 0 ? results[0] : null);
+    });
+  });
+};
 
 module.exports = {
   getAllTeams,
@@ -841,4 +917,6 @@ module.exports = {
   markAsRead,
   getSubjectAreasByConsultantName,
   getTeamById,
+  getFollowerByID,
+  getAddCallRequestByBookingId
 };

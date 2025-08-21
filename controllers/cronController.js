@@ -396,11 +396,11 @@ const handleEmailNotifications = (
             try {
               if (crmInfo.fld_email) {
                 const link = `${process.env.BASE_URL}/admin/booking_detail/${booking.id}`;
-                const message = `Your call with the client <b>${booking.fld_name}</b> has been Auto ${consultation_sts}ed.<br/> 
+                const message = `Your ${booking.fld_sale_type} request with Booking id <b>${booking.fld_bookingcode}</b> for client ${booking.fld_name} has been Auto ${consultation_sts}ed.<br/> 
           <a href="${link}" target="_blank" class="view-task-btn">View Booking</a>`;
 
                 axios.post(
-                  "https://webexback-06cc.onrender.com/api/users/send-loop-updates",
+                  "https://webexback-06cc.onrender.com/api/users/send-cc-updates",
                   {
                     email: crmInfo.fld_email,
                     message,
