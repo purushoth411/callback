@@ -2,6 +2,7 @@
 const dashboardModel = require("../models/dashboardModel");
 const db = require("../config/db");
 const moment = require("moment-timezone");
+const { getIO } = require("../socket");
 
 function getCurrentDate(format = "YYYY-MM-DD") {
   return moment().tz("Asia/Kolkata").format(format);
@@ -173,7 +174,8 @@ const saveConsultantSettings = (req, res) => {
         .status(500)
         .json({ status: false, message: "Database update failed" });
     }
-
+    const io = getIO();
+    io.emit("slotChanged", {consultantid});
     return res.status(200).json({
       status: true,
       message: "Consultant settings updated successfully",
@@ -228,7 +230,8 @@ const updateBlockSlots = (req, res) => {
           error: err.message || err,
         });
       }
-
+      const io = getIO();
+      io.emit("slotChanged", {consultantid});
       return res.json({
         status: true,
         message: "Blocked slots updated successfully",
