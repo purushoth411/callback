@@ -2430,11 +2430,7 @@ const updateConsultationStatus = async (req, res) => {
               processConsultantHistory(booking.fld_secondary_consultant_id);
             }
 
-            // Process third consultant history
-            if (booking.fld_third_consultantid > 0) {
-              processConsultantHistory(booking.fld_third_consultantid);
-            }
-
+           
             // Send emails based on status
             handleEmailNotifications(
               booking,

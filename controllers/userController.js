@@ -3,6 +3,7 @@ const bookingModel = require('../models/bookingModel');
 const helperModel = require('../models/helperModel');
 const { getIO } = require("../socket");
 const sendPostmarkMail = require('../sendPostmarkMail');
+const axios = require("axios");
 
 const loginUser = (req, res) => {
     const { username, userpass } = req.body;
@@ -352,8 +353,25 @@ const sendOtpVerification = (req, res) => {
       ${otpCode} is your OTP for Password Reset.<br/><br/>
       Thanks & regards,<br/>${process.env.WEBNAME}<br/>
     `;
+  try {
+    if (userRow.fld_email) {
+      const message = `Your OTP for reset password is <b>${otpCode}</b>.<br/>`;
+      axios.post(
+        "https://webexback-06cc.onrender.com/api/users/send-cc-updates",
+        {
+          email: userRow.fld_email,
+          message,
+        }
+      );
 
-  
+      console.log(` Call update sent to ${userRow.fld_email}`);
+    } else {
+      console.warn(` No email found for task assignee`);
+    }
+  } catch (err) {
+    console.error(` Failed to send loop update:`, err.message);
+  }
+    
       sendPostmarkMail(
         {
           from: process.env.FROM_EMAIL,
