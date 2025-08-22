@@ -1,7 +1,7 @@
 const db = require("../config/db");
 
 // Get call drive links
-const getCallDriveLink = (email, callback) => {
+const getCallDriveLink = (email,website, callback) => {
   db.getConnection((err, connection) => {
     if (err) return callback(err);
 
@@ -23,10 +23,11 @@ const getCallDriveLink = (email, callback) => {
         SELECT fld_call_complete_recording
         FROM tbl_booking
         WHERE fld_userid = ?
+        AND fld_insta_website = ?
         ORDER BY id DESC
       `;
 
-      connection.query(sqlBookings, [userId], (err2, results) => {
+      connection.query(sqlBookings, [userId, website], (err2, results) => {
         connection.release();
         if (err2) return callback(err2);
         return callback(null, { status: true, data: results });

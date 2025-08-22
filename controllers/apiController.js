@@ -2,9 +2,10 @@ const apiModel = require("../models/apiModel");
 
 const getCallDriveLink = (req, res) => {
   const email = req.query.email;
-  if (!email) return res.json({ status: false, error: "Email is missing" });
+  const website = req.query.website;
+  if (!email || !website) return res.json({ status: false, error: "Email or website missing" });
 
-  apiModel.getCallDriveLink(email, (err, result) => {
+  apiModel.getCallDriveLink(email, website,  (err, result) => {
     if (err) return res.status(500).json({ status: false, error: err.message });
     res.json(result);
   });
